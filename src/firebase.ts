@@ -12,12 +12,12 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 
 // 👇 REPLACE WITH YOUR OWN CONFIG
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId:             "YOUR_APP_ID",
+  apiKey: "AIzaSyDNDY1WH4JJW_rRhgewOK94ApY4fF8G5A4",
+  authDomain: "ds-project-manager.firebaseapp.com",
+  projectId: "ds-project-manager",
+  storageBucket: "ds-project-manager.firebasestorage.app",
+  messagingSenderId: "587128203685",
+  appId: "1:587128203685:web:780bcd15ac467cecb0204c"
 };
 
 let app: FirebaseApp;
