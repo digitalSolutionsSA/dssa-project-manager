@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Client, Task, CalendarEvent, CostItem, DevProject,
   BudgetIncomeItem, BudgetExpenseItem, UnforeseenExpense,
@@ -118,18 +118,32 @@ export function useStore() {
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
   const [fbReady,setFbReady]                     = useState(false);
   const isFirebaseConfigured = !!getFirebaseDb();
+  const applyingRemoteUpdate = useRef(false);
+
+  const persistAndSync = (localKey: string, firebaseKey: string, value: unknown) => {
+    save(localKey, value);
+
+    if (!fbReady) return;
+
+    if (applyingRemoteUpdate.current) {
+      applyingRemoteUpdate.current = false;
+      return;
+    }
+
+    fbPush(firebaseKey, value);
+  };
 
   // ── LocalStorage persist ──────────────────────────────────────
-  useEffect(()=>{save(K.clients,clients);if(fbReady)fbPush('clients',clients);},[clients,fbReady]);
-  useEffect(()=>{save(K.events,events);if(fbReady)fbPush('events',events);},[events,fbReady]);
-  useEffect(()=>{save(K.costs,costs);if(fbReady)fbPush('costs',costs);},[costs,fbReady]);
-  useEffect(()=>{save(K.devProjects,devProjects);if(fbReady)fbPush('devProjects',devProjects);},[devProjects,fbReady]);
-  useEffect(()=>{save(K.budgetInc,budgetIncome);if(fbReady)fbPush('budgetIncome',budgetIncome);},[budgetIncome,fbReady]);
-  useEffect(()=>{save(K.budgetExp,budgetExpenses);if(fbReady)fbPush('budgetExpenses',budgetExpenses);},[budgetExpenses,fbReady]);
-  useEffect(()=>{save(K.unforeseen,unforeseenExpenses);if(fbReady)fbPush('unforeseenExpenses',unforeseenExpenses);},[unforeseenExpenses,fbReady]);
-  useEffect(()=>{save(K.onceOff,onceOffCosts);if(fbReady)fbPush('onceOffCosts',onceOffCosts);},[onceOffCosts,fbReady]);
-  useEffect(()=>{save(K.snapshots,monthlySnapshots);if(fbReady)fbPush('monthlySnapshots',monthlySnapshots);},[monthlySnapshots,fbReady]);
-  useEffect(()=>{save(K.notes,meetingNotes);if(fbReady)fbPush('meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
+  useEffect(()=>{persistAndSync(K.clients,'clients',clients);},[clients,fbReady]);
+  useEffect(()=>{persistAndSync(K.events,'events',events);},[events,fbReady]);
+  useEffect(()=>{persistAndSync(K.costs,'costs',costs);},[costs,fbReady]);
+  useEffect(()=>{persistAndSync(K.devProjects,'devProjects',devProjects);},[devProjects,fbReady]);
+  useEffect(()=>{persistAndSync(K.budgetInc,'budgetIncome',budgetIncome);},[budgetIncome,fbReady]);
+  useEffect(()=>{persistAndSync(K.budgetExp,'budgetExpenses',budgetExpenses);},[budgetExpenses,fbReady]);
+  useEffect(()=>{persistAndSync(K.unforeseen,'unforeseenExpenses',unforeseenExpenses);},[unforeseenExpenses,fbReady]);
+  useEffect(()=>{persistAndSync(K.onceOff,'onceOffCosts',onceOffCosts);},[onceOffCosts,fbReady]);
+  useEffect(()=>{persistAndSync(K.snapshots,'monthlySnapshots',monthlySnapshots);},[monthlySnapshots,fbReady]);
+  useEffect(()=>{persistAndSync(K.notes,'meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
 
   // ── Firebase realtime listener ────────────────────────────────
   useEffect(()=>{
@@ -151,7 +165,10 @@ export function useStore() {
       return onSnapshot(doc(db,'appData',key),(snap)=>{
         if(snap.exists()){
           const d=snap.data();
-          if(d&&Array.isArray(d.value)){setter(d.value);}
+          if(d&&Array.isArray(d.value)){
+            applyingRemoteUpdate.current = true;
+            setter(d.value);
+          }
         }
         setFbReady(true);
       },(err)=>{ console.warn('FB listen error:',err.message); setFbReady(true); });
