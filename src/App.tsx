@@ -911,7 +911,7 @@ export default function App() {
     addOnceOffCost, deleteOnceOffCost, updateOnceOffCost, toggleOnceOffPaid,
     saveMonthSnapshot, deleteSnapshot, updateSnapshotNotes,
     addMeetingNote, deleteMeetingNote, updateMeetingNote,
-    isFirebaseConfigured,
+    isFirebaseConfigured, fbReady, fbError,
     totalMonthlyIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid, totalPendingIncome, totalProfit, overdueCount,
     totalBudgetIncome, totalBudgetExpenses, totalUnforeseen, budgetBalance,
     allTimeBusinessIncome, allTimeBusinessProfit, allTimePersonalBalance,
@@ -957,9 +957,14 @@ export default function App() {
           <h1 className="header-title">Digital Solutions SA</h1>
         </div>
         <div className="header-right">
-          <div className={`firebase-status ${isFirebaseConfigured ? 'connected' : 'local'}`} title={isFirebaseConfigured ? 'Syncing to Firebase' : 'Local only'}>
-            {isFirebaseConfigured ? <Wifi size={13}/> : <WifiOff size={13}/>}
-            <span className="fb-label">{isFirebaseConfigured ? 'Synced' : 'Local'}</span>
+          <div
+            className={`firebase-status ${!isFirebaseConfigured ? 'local' : fbError ? 'error' : fbReady ? 'connected' : 'connecting'}`}
+            title={!isFirebaseConfigured ? 'Local only — changes stay on this device' : fbError ? `Sync error: ${fbError}` : fbReady ? 'Synced across all devices' : 'Connecting to Firebase…'}
+          >
+            {!isFirebaseConfigured || fbError ? <WifiOff size={13}/> : <Wifi size={13}/>}
+            <span className="fb-label">
+              {!isFirebaseConfigured ? 'Local' : fbError ? 'Sync Error' : fbReady ? 'Synced' : 'Syncing…'}
+            </span>
           </div>
           {overdueCount > 0 && (
             <div className="header-overdue">

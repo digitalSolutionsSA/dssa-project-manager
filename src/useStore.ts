@@ -117,16 +117,19 @@ export function useStore() {
   const [monthlySnapshots,setSnapshots]          = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
   const [fbReady,setFbReady]                     = useState(false);
+  const [fbError,setFbError]                     = useState<string|null>(null);
   const isFirebaseConfigured = !!getFirebaseDb();
-  const applyingRemoteUpdate = useRef(false);
+  // Track which collection keys are being updated from Firebase so we don't
+  // push stale localStorage data back after receiving a remote snapshot.
+  const remoteUpdateKeys = useRef(new Set<string>());
 
   const persistAndSync = (localKey: string, firebaseKey: string, value: unknown) => {
     save(localKey, value);
 
     if (!fbReady) return;
 
-    if (applyingRemoteUpdate.current) {
-      applyingRemoteUpdate.current = false;
+    if (remoteUpdateKeys.current.has(firebaseKey)) {
+      remoteUpdateKeys.current.delete(firebaseKey);
       return;
     }
 
@@ -166,12 +169,17 @@ export function useStore() {
         if(snap.exists()){
           const d=snap.data();
           if(d&&Array.isArray(d.value)){
-            applyingRemoteUpdate.current = true;
+            remoteUpdateKeys.current.add(key);
             setter(d.value);
           }
         }
         setFbReady(true);
-      },(err)=>{ console.warn('FB listen error:',err.message); setFbReady(true); });
+        setFbError(null);
+      },(err)=>{
+        console.warn('FB listen error:',err.message);
+        setFbError(err.message);
+        setFbReady(true);
+      });
     });
     return ()=>unsubs.forEach(u=>u());
   },[]);
@@ -334,7 +342,7 @@ export function useStore() {
     clients,events,costs,devProjects,
     budgetIncome,budgetExpenses,unforeseenExpenses,
     onceOffCosts,monthlySnapshots,meetingNotes,
-    isFirebaseConfigured,
+    isFirebaseConfigured, fbReady, fbError,
     addClient,deleteClient,updateClientName,updateClientColor,updateClientIcon,updateClientFinancials,
     addTask,toggleTask,deleteTask,editTask,
     addCost,deleteCost,updateCost,
