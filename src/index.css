@@ -385,15 +385,22 @@ body {
 .client-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
 
 .client-header {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 14px; flex-wrap: wrap;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px 12px;
 }
-.client-emoji { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
-.client-name { font-size: 1rem; font-weight: 700; flex: 1; min-width: 80px; cursor: pointer; color: #fff; letter-spacing: -0.01em; line-height: 1.35; word-break: break-word; }
-.client-name-input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; color: #fff; font-size: 1rem; font-weight: 700; padding: 3px 8px; outline: none; }
+.client-header-top {
+  display: flex; align-items: center; gap: 8px;
+}
+.client-emoji { font-size: 1.35rem; flex-shrink: 0; }
+.client-name {
+  font-size: 1.05rem; font-weight: 700; cursor: pointer; color: #fff;
+  letter-spacing: -0.01em; line-height: 1.3; margin: 0;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.client-name-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; color: #fff; font-size: 1rem; font-weight: 700; padding: 4px 8px; outline: none; }
 .client-header-actions {
   display: flex; align-items: center; gap: 4px;
-  flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0;
+  flex-wrap: wrap; justify-content: flex-end; flex: 1;
 }
 .overdue-count { font-size: 0.75rem; font-weight: 700; background: rgba(239,68,68,0.25); color: #fff; padding: 2px 7px; cursor: pointer; border: 1px solid rgba(239,68,68,0.5); border-radius: 4px; animation: pulse-r 1.5s ease-in-out infinite; white-space: nowrap; }
 .task-count { font-size: 0.78rem; color: rgba(255,255,255,0.55); white-space: nowrap; font-weight: 500; }
@@ -647,7 +654,7 @@ body {
   .cal-cell { min-height: 55px; padding: 4px; }
   .cal-day-num { width: 22px; height: 22px; font-size: 0.8rem; }
   /* Client header — icon buttons smaller on tablet */
-  .client-header { padding: 10px 12px; gap: 8px; }
+  .client-header { padding: 8px 10px 10px; gap: 6px; }
   .icon-btn { width: 30px; height: 30px; }
   .client-paid-btn { padding: 3px 8px; font-size: 0.7rem; }
   /* Balance row stacks nicely */
@@ -672,8 +679,8 @@ body {
   .balance-card { min-width: unset; width: 100%; }
   .btn-reset-month { width: 100%; justify-content: center; }
   /* Client card adjustments */
-  .client-header { padding: 10px; gap: 6px; }
-  .client-emoji { font-size: 1.2rem; }
+  .client-header { padding: 8px 10px; gap: 5px; }
+  .client-emoji { font-size: 1.1rem; }
   .icon-btn { width: 28px; height: 28px; }
   .client-paid-btn span { display: none; }
   .client-paid-btn { padding: 4px 6px; }

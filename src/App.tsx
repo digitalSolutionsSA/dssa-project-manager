@@ -878,13 +878,10 @@ function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, o
 
       <div className="client-card" style={{ '--client-color': client.color } as React.CSSProperties}>
         <div className="client-header" style={{ background: client.color }}>
-          <span className="client-emoji">{client.icon}</span>
-          {editingName
-            ? <input className="client-name-input" value={nameVal} onChange={e => setNameVal(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && saveName()} onBlur={saveName} autoFocus />
-            : <h2 className="client-name" onDoubleClick={() => setEditingName(true)}>{client.name}</h2>
-          }
-          <div className="client-header-actions">
+          {/* Top row: emoji + all action buttons */}
+          <div className="client-header-top">
+            <span className="client-emoji">{client.icon}</span>
+            <div className="client-header-actions">
             {overdueTasks.length > 0 && (
               <span className="overdue-count" onClick={() => setAlertTask(overdueTasks[0])}>⚠ {overdueTasks.length}</span>
             )}
@@ -901,7 +898,15 @@ function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, o
             <button className="icon-btn dark" onClick={() => setShowFin(p => !p)}><DollarSign size={14} /></button>
             <button className="icon-btn dark" onClick={() => setCollapsed(p => !p)}>{collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}</button>
             <button className="icon-btn dark-red" onClick={onDeleteClient}><Trash2 size={14} /></button>
-          </div>
+            </div>{/* end client-header-actions */}
+          </div>{/* end client-header-top */}
+
+          {/* Bottom row: client name */}
+          {editingName
+            ? <input className="client-name-input" value={nameVal} onChange={e => setNameVal(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveName()} onBlur={saveName} autoFocus />
+            : <h2 className="client-name" onDoubleClick={() => setEditingName(true)}>{client.name}</h2>
+          }
         </div>
 
         {!collapsed && (
