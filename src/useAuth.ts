@@ -16,8 +16,9 @@ async function hashPin(pin: string): Promise<string> {
     .join('');
 }
 
-const SESSION_KEY = 'pm_session_uid';
-const USERS_KEY   = 'pm_users_cache';
+// Users are cached in localStorage so the list loads instantly on next visit,
+// but the SESSION is never persisted — every page load requires re-login.
+const USERS_KEY = 'pm_users_cache';
 
 function loadCachedUsers(): AppUser[] {
   try {
@@ -39,16 +40,15 @@ async function fbPushUsers(list: AppUser[]) {
 
 // ── Hook ──────────────────────────────────────────────────────────
 export function useAuth() {
-  const [users, setUsers]           = useState<AppUser[]>(loadCachedUsers);
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
-  const [isLoading, setIsLoading]   = useState(true);
-  const [authError, setAuthError]   = useState<string | null>(null);
+  const [users, setUsers]             = useState<AppUser[]>(loadCachedUsers);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null); // never restored from storage
+  const [isLoading, setIsLoading]     = useState(true);
+  const [authError, setAuthError]     = useState<string | null>(null);
 
   // ── Load users from Firestore (or localStorage fallback) ──────
   useEffect(() => {
     const db = getFirebaseDb();
     if (!db) {
-      // No Firebase — use localStorage only, seed admin if empty
       const cached = loadCachedUsers();
       if (cached.length === 0) {
         hashPin('134679').then(pinHash => {
@@ -87,7 +87,6 @@ export function useAuth() {
       },
       (err) => {
         console.warn('Auth listener error:', err.message);
-        // Fall back to cache
         const cached = loadCachedUsers();
         if (cached.length > 0) setUsers(cached);
         setIsLoading(false);
@@ -95,16 +94,6 @@ export function useAuth() {
     );
     return () => unsub();
   }, []);
-
-  // ── Restore session once users are loaded ─────────────────────
-  useEffect(() => {
-    if (isLoading || users.length === 0) return;
-    const uid = localStorage.getItem(SESSION_KEY);
-    if (!uid) return;
-    const found = users.find(u => u.id === uid);
-    if (found) setCurrentUser(found);
-    else localStorage.removeItem(SESSION_KEY); // user was deleted
-  }, [isLoading, users]);
 
   // ── Seed default admin ────────────────────────────────────────
   async function seedAdmin() {
@@ -119,7 +108,7 @@ export function useAuth() {
     await fbPushUsers(list);
   }
 
-  // ── Login ─────────────────────────────────────────────────────
+  // ── Login — session lives in memory only, clears on reload ────
   async function login(username: string, pin: string): Promise<boolean> {
     setAuthError(null);
     const pinHash = await hashPin(pin);
@@ -130,14 +119,12 @@ export function useAuth() {
       setAuthError('Incorrect username or PIN. Please try again.');
       return false;
     }
-    localStorage.setItem(SESSION_KEY, match.id);
-    setCurrentUser(match);
+    setCurrentUser(match); // memory only — no localStorage
     return true;
   }
 
   // ── Logout ────────────────────────────────────────────────────
   function logout() {
-    localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
   }
 

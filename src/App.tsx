@@ -810,12 +810,13 @@ function FinancialsPanel({ client, onUpdate }: {
 // CLIENT CARD
 // ══════════════════════════════════════════════════════════════════
 function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, onUpdateColor, onUpdateIcon,
-  onUpdateFinancials, onAddTask, onToggleTask, onDeleteTask, onEditTask
+  onUpdateFinancials, onTogglePaid, onAddTask, onToggleTask, onDeleteTask, onEditTask
 }: {
   client: Client; users: AppUser[]; assistants: AppUser[];
   onDeleteClient: () => void; onUpdateName: (n: string) => void;
   onUpdateColor: (c: string) => void; onUpdateIcon: (i: string) => void;
   onUpdateFinancials: (f: 'monthlyIncome' | 'adSpend' | 'monthlyCost', v: number) => void;
+  onTogglePaid: () => void;
   onAddTask: (t: string, d: string, uid?: string) => void; onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void; onEditTask: (id: string, t: string, d: string) => void;
 }) {
@@ -849,6 +850,14 @@ function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, o
               <span className="overdue-count" onClick={() => setAlertTask(overdueTasks[0])}>⚠ {overdueTasks.length}</span>
             )}
             <span className="task-count">{pending.length} open</span>
+            <button
+              className={`client-paid-btn ${client.paidThisMonth ? 'paid' : ''}`}
+              onClick={onTogglePaid}
+              title={client.paidThisMonth ? 'Paid this month ✓ — click to undo' : 'Mark as paid this month'}
+            >
+              <CircleCheck size={14} />
+              <span>{client.paidThisMonth ? 'Paid' : 'Unpaid'}</span>
+            </button>
             <button className="icon-btn dark" onClick={() => setShowCustomise(true)}><Palette size={14} /></button>
             <button className="icon-btn dark" onClick={() => setShowFin(p => !p)}><DollarSign size={14} /></button>
             <button className="icon-btn dark" onClick={() => setCollapsed(p => !p)}>{collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}</button>
@@ -888,31 +897,107 @@ function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, o
 // ══════════════════════════════════════════════════════════════════
 // SUMMARY BAR
 // ══════════════════════════════════════════════════════════════════
-function SummaryBar({ totalIncome, totalAdSpend, totalCosts, totalPending, totalProfit }: {
-  totalIncome: number; totalAdSpend: number; totalCosts: number;
-  totalPending: number; totalProfit: number;
+function SummaryBar({
+  currentBalance, onBalanceChange,
+  totalIncome, totalReceivedIncome, totalAdSpend, totalCosts,
+  totalPending, totalProfit, businessBalance,
+  onResetMonth,
+}: {
+  currentBalance: number; onBalanceChange: (n: number) => void;
+  totalIncome: number; totalReceivedIncome: number; totalAdSpend: number;
+  totalCosts: number; totalPending: number; totalProfit: number;
+  businessBalance: number; onResetMonth: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [raw, setRaw]         = useState('');
+
+  function startEdit() { setRaw(currentBalance === 0 ? '' : String(currentBalance)); setEditing(true); }
+  function commitEdit() {
+    const n = parseFloat(raw.replace(/[^0-9.]/g, ''));
+    onBalanceChange(isNaN(n) ? 0 : n);
+    setEditing(false);
+  }
+
+  const unpaidCount = Math.round((totalIncome - totalReceivedIncome) / (totalIncome || 1) * 100);
+
   return (
-    <div className="summary-bar">
-      <div className="sum-item income">
-        <span className="sum-lbl">Monthly Income</span>
-        <span className="sum-val">{fmtR(totalIncome)}</span>
+    <div className="summary-wrap">
+      {/* Balance row */}
+      <div className="balance-row">
+        <div className="balance-card">
+          <span className="balance-lbl">Current Bank Balance</span>
+          {editing ? (
+            <div className="balance-edit-row">
+              <span className="balance-prefix">R</span>
+              <input
+                className="balance-input"
+                type="number"
+                value={raw}
+                onChange={e => setRaw(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+                autoFocus
+                placeholder="0"
+              />
+            </div>
+          ) : (
+            <button className="balance-val" onClick={startEdit} title="Click to edit balance">
+              {fmtR(currentBalance)}
+              <Edit3 size={12} className="balance-edit-icon" />
+            </button>
+          )}
+        </div>
+        <div className={`balance-card total ${businessBalance >= 0 ? 'pos' : 'neg'}`}>
+          <span className="balance-lbl">Available Balance</span>
+          <span className="balance-val-display">{fmtR(businessBalance)}</span>
+          <span className="balance-formula">Bank + Received − Costs</span>
+        </div>
+        <button className="btn-reset-month" onClick={onResetMonth} title="Clear all paid flags for a new month">
+          <RefreshCw size={13} /> New Month
+        </button>
       </div>
-      <div className="sum-item pending">
-        <span className="sum-lbl">Pending (Dev)</span>
-        <span className="sum-val">{fmtR(totalPending)}</span>
-      </div>
-      <div className="sum-item spend">
-        <span className="sum-lbl">Ad Spend</span>
-        <span className="sum-val">{fmtR(totalAdSpend)}</span>
-      </div>
-      <div className="sum-item cost">
-        <span className="sum-lbl">Total Costs</span>
-        <span className="sum-val">{fmtR(totalCosts)}</span>
-      </div>
-      <div className={`sum-item profit ${totalProfit >= 0 ? 'pos' : 'neg'}`}>
-        <span className="sum-lbl">Net Profit</span>
-        <span className="sum-val">{fmtR(totalProfit)}</span>
+
+      {/* Income progress bar */}
+      {totalIncome > 0 && (
+        <div className="income-progress-wrap">
+          <div className="income-progress-labels">
+            <span>Received <strong>{fmtR(totalReceivedIncome)}</strong></span>
+            <span style={{ color: 'var(--text3)' }}>Expected <strong>{fmtR(totalIncome)}</strong>
+              {totalReceivedIncome < totalIncome && <span className="income-outstanding"> · {fmtR(totalIncome - totalReceivedIncome)} outstanding</span>}
+            </span>
+          </div>
+          <div className="income-progress-bar">
+            <div
+              className="income-progress-fill"
+              style={{ width: `${Math.min(100, (totalReceivedIncome / totalIncome) * 100)}%` }}
+            />
+          </div>
+          <span className="income-progress-pct">{Math.round((totalReceivedIncome / totalIncome) * 100)}% collected</span>
+        </div>
+      )}
+
+      {/* Stats row */}
+      <div className="summary-bar">
+        <div className="sum-item income">
+          <span className="sum-lbl">Expected Income</span>
+          <span className="sum-val">{fmtR(totalIncome)}</span>
+        </div>
+        <div className="sum-item pending">
+          <span className="sum-lbl">Pending (Dev)</span>
+          <span className="sum-val">{fmtR(totalPending)}</span>
+        </div>
+        <div className="sum-item spend">
+          <span className="sum-lbl">Ad Spend</span>
+          <span className="sum-val">{fmtR(totalAdSpend)}</span>
+        </div>
+        <div className="sum-item cost">
+          <span className="sum-lbl">Total Costs</span>
+          <span className="sum-val">{fmtR(totalCosts)}</span>
+        </div>
+        <div className={`sum-item profit ${totalProfit >= 0 ? 'pos' : 'neg'}`}>
+          <span className="sum-lbl">Net Profit</span>
+          <span className="sum-val">{fmtR(totalProfit)}</span>
+        </div>
       </div>
     </div>
   );
@@ -973,9 +1058,12 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     saveMonthSnapshot, deleteSnapshot, updateSnapshotNotes,
     addMeetingNote, deleteMeetingNote, updateMeetingNote,
     isFirebaseConfigured, fbReady, fbError,
-    totalMonthlyIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid, totalPendingIncome, totalProfit, overdueCount,
+    currentBalance, setCurrentBalance,
+    totalMonthlyIncome, totalReceivedIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid,
+    totalPendingIncome, totalProfit, businessBalance, overdueCount,
     totalBudgetIncome, totalBudgetExpenses, totalUnforeseen, budgetBalance,
     allTimeBusinessIncome, allTimeBusinessProfit, allTimePersonalBalance,
+    toggleClientPaid, resetMonthlyPayments,
   } = useStore();
 
   const [newClientName, setNewClientName] = useState('');
@@ -1028,9 +1116,9 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
               {!isFirebaseConfigured ? 'Local' : fbError ? 'Sync Error' : fbReady ? 'Synced' : 'Syncing…'}
             </span>
           </div>
-          <button className="btn-logout" onClick={auth.logout} title="Logout">
+          <button className="btn-logout" onClick={auth.logout}>
             <LogOut size={14} />
-            <span className="btn-logout-label">{auth.currentUser?.displayName || auth.currentUser?.username}</span>
+            <span className="btn-logout-label">Sign Out</span>
           </button>
           {overdueCount > 0 && (
             <div className="header-overdue">
@@ -1042,8 +1130,11 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
 
       {/* Summary */}
       <SummaryBar
-        totalIncome={totalMonthlyIncome} totalAdSpend={totalAdSpend}
-        totalCosts={totalCosts} totalPending={totalPendingIncome} totalProfit={totalProfit}
+        currentBalance={currentBalance} onBalanceChange={setCurrentBalance}
+        totalIncome={totalMonthlyIncome} totalReceivedIncome={totalReceivedIncome}
+        totalAdSpend={totalAdSpend} totalCosts={totalCosts}
+        totalPending={totalPendingIncome} totalProfit={totalProfit}
+        businessBalance={businessBalance} onResetMonth={resetMonthlyPayments}
       />
 
       {/* Costs */}
@@ -1099,6 +1190,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
                 onUpdateColor={col => updateClientColor(c.id, col)}
                 onUpdateIcon={i => updateClientIcon(c.id, i)}
                 onUpdateFinancials={(f, v) => updateClientFinancials(c.id, f, v)}
+                onTogglePaid={() => toggleClientPaid(c.id)}
                 onAddTask={(t, d, uid) => addTask(c.id, t, d, uid)}
                 onToggleTask={tid => toggleTask(c.id, tid)}
                 onDeleteTask={tid => deleteTask(c.id, tid)}

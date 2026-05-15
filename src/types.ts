@@ -31,6 +31,7 @@ export interface Client {
   monthlyIncome: number;
   adSpend: number;
   monthlyCost: number;
+  paidThisMonth?: boolean;  // must be ticked before income counts toward balance
 }
 
 // ── Business Monthly Costs ────────────────────────────────────────

@@ -20,6 +20,7 @@ const K = {
   onceOff:      'sb_onceOffCosts',
   snapshots:    'sb_snapshots',
   notes:        'sb_meetingNotes',
+  balance:      'sb_currentBalance',
 };
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -128,6 +129,7 @@ export function useStore() {
   const [onceOffCosts,setOnceOffCosts]           = useState<OnceOffCost[]>(()=>load(K.onceOff,[]));
   const [monthlySnapshots,setSnapshots]          = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
+  const [currentBalance,setCurrentBalance]        = useState<number>(()=>load(K.balance,0));
   const [fbReady,setFbReady]                     = useState(false);
   const [fbError,setFbError]                     = useState<string|null>(null);
   const isFirebaseConfigured = !!getFirebaseDb();
@@ -159,6 +161,13 @@ export function useStore() {
   useEffect(()=>{persistAndSync(K.onceOff,'onceOffCosts',onceOffCosts);},[onceOffCosts,fbReady]);
   useEffect(()=>{persistAndSync(K.snapshots,'monthlySnapshots',monthlySnapshots);},[monthlySnapshots,fbReady]);
   useEffect(()=>{persistAndSync(K.notes,'meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
+  // Balance is a plain number — wrap in array so persistAndSync works unchanged
+  useEffect(()=>{
+    save(K.balance, currentBalance);
+    if (!fbReady) return;
+    if (remoteUpdateKeys.current.has('currentBalance')) { remoteUpdateKeys.current.delete('currentBalance'); return; }
+    fbPush('currentBalance', currentBalance);
+  },[currentBalance,fbReady]);
 
   // ── Firebase realtime listener ────────────────────────────────
   useEffect(()=>{
@@ -193,7 +202,17 @@ export function useStore() {
         setFbReady(true);
       });
     });
-    return ()=>unsubs.forEach(u=>u());
+    // Balance listener (plain number, not array)
+    const balanceUnsub = onSnapshot(doc(db,'appData','currentBalance'),(snap)=>{
+      if(snap.exists()){
+        const d=snap.data();
+        if(d && typeof d.value==='number'){
+          remoteUpdateKeys.current.add('currentBalance');
+          setCurrentBalance(d.value);
+        }
+      }
+    });
+    return ()=>{ unsubs.forEach(u=>u()); balanceUnsub(); };
   },[]);
 
   // ── CLIENTS ──────────────────────────────────────────────────────
@@ -202,6 +221,8 @@ export function useStore() {
     setClients(p=>[...p,{id:genId(),name,color:PRESET_COLORS[idx],icon:PRESET_ICONS[idx],tasks:[],monthlyIncome:0,adSpend:0,monthlyCost:0}]);
   };
   const deleteClient=(id:string)=>setClients(p=>p.filter(c=>c.id!==id));
+  const toggleClientPaid=(id:string)=>setClients(p=>p.map(c=>c.id===id?{...c,paidThisMonth:!c.paidThisMonth}:c));
+  const resetMonthlyPayments=()=>setClients(p=>p.map(c=>({...c,paidThisMonth:false})));
   const updateClientName=(id:string,name:string)=>setClients(p=>p.map(c=>c.id===id?{...c,name}:c));
   const updateClientColor=(id:string,color:string)=>setClients(p=>p.map(c=>c.id===id?{...c,color}:c));
   const updateClientIcon=(id:string,icon:string)=>setClients(p=>p.map(c=>c.id===id?{...c,icon}:c));
@@ -325,19 +346,21 @@ export function useStore() {
       .sort((a,b)=>b.date.localeCompare(a.date)));
 
   // ── COMPUTED ──────────────────────────────────────────────────────
-  const totalMonthlyIncome = clients.reduce((s,c)=>s+c.monthlyIncome,0);
-  const totalAdSpend       = clients.reduce((s,c)=>s+c.adSpend,0);
-  const totalMonthlyCosts  = costs.reduce((s,c)=>s+c.amount,0);
-  const totalClientCosts   = clients.reduce((s,c)=>s+c.monthlyCost,0);
-  const totalOnceOffUnpaid = onceOffCosts.filter(c=>!c.paid).reduce((s,c)=>s+c.amount,0);
-  const totalCosts         = totalMonthlyCosts + totalClientCosts + totalOnceOffUnpaid;
-  const totalPendingIncome = devProjects.reduce((s,p)=>{
+  const totalMonthlyIncome  = clients.reduce((s,c)=>s+c.monthlyIncome,0);
+  const totalReceivedIncome = clients.filter(c=>c.paidThisMonth).reduce((s,c)=>s+c.monthlyIncome,0);
+  const totalAdSpend        = clients.reduce((s,c)=>s+c.adSpend,0);
+  const totalMonthlyCosts   = costs.reduce((s,c)=>s+c.amount,0);
+  const totalClientCosts    = clients.reduce((s,c)=>s+c.monthlyCost,0);
+  const totalOnceOffUnpaid  = onceOffCosts.filter(c=>!c.paid).reduce((s,c)=>s+c.amount,0);
+  const totalCosts          = totalMonthlyCosts + totalClientCosts + totalOnceOffUnpaid;
+  const totalPendingIncome  = devProjects.reduce((s,p)=>{
     let pending=0;
     if(!p.depositPaid)pending+=p.depositAmount;
     if(!p.finalPaid)  pending+=p.finalAmount;
     return s+pending;
   },0);
-  const totalProfit = totalMonthlyIncome - totalAdSpend - totalCosts;
+  const totalProfit         = totalMonthlyIncome - totalAdSpend - totalCosts;
+  const businessBalance     = currentBalance + totalReceivedIncome - totalCosts;
 
   const totalBudgetIncome   = budgetIncome.reduce((s,i)=>s+i.amount,0);
   const totalBudgetExpenses = budgetExpenses.reduce((s,e)=>s+e.amount,0);
@@ -358,8 +381,10 @@ export function useStore() {
     clients,events,costs,devProjects,
     budgetIncome,budgetExpenses,unforeseenExpenses,
     onceOffCosts,monthlySnapshots,meetingNotes,
+    currentBalance, setCurrentBalance,
     isFirebaseConfigured, fbReady, fbError,
     addClient,deleteClient,updateClientName,updateClientColor,updateClientIcon,updateClientFinancials,
+    toggleClientPaid, resetMonthlyPayments,
     addTask,toggleTask,deleteTask,editTask,assignTask,updateTaskStatus,
     addCost,deleteCost,updateCost,
     addOnceOffCost,deleteOnceOffCost,updateOnceOffCost,toggleOnceOffPaid,
@@ -373,8 +398,8 @@ export function useStore() {
     addUnforeseen,deleteUnforeseen,updateUnforeseen,toggleUnforeseenPaid,
     saveMonthSnapshot,deleteSnapshot,updateSnapshotNotes,
     addMeetingNote,deleteMeetingNote,updateMeetingNote,
-    totalMonthlyIncome,totalAdSpend,totalCosts,totalMonthlyCosts,totalClientCosts,
-    totalOnceOffUnpaid,totalPendingIncome,totalProfit,
+    totalMonthlyIncome,totalReceivedIncome,totalAdSpend,totalCosts,totalMonthlyCosts,totalClientCosts,
+    totalOnceOffUnpaid,totalPendingIncome,totalProfit,businessBalance,
     totalBudgetIncome,totalBudgetExpenses,totalUnforeseen,budgetBalance,
     allTimeBusinessIncome,allTimeBusinessProfit,allTimePersonalBalance,
     overdueCount,
