@@ -1,9 +1,24 @@
+// ── Auth ──────────────────────────────────────────────────────────
+export type UserRole   = 'admin' | 'assistant';
+export type TaskStatus = 'not-started' | 'in-progress' | 'completed';
+
+export interface AppUser {
+  id: string;
+  username: string;
+  pinHash: string;        // SHA-256 hex of the PIN
+  role: UserRole;
+  displayName: string;
+  createdAt: string;
+}
+
 // ── Retainer Clients ─────────────────────────────────────────────
 export interface Task {
   id: string;
   title: string;
   dueDate: string;
-  completed: boolean;
+  status: TaskStatus;
+  completed?: boolean;    // legacy field — read during migration only
+  assignedTo?: string;    // AppUser.id
   createdAt: string;
 }
 
@@ -114,37 +129,31 @@ export interface UnforeseenExpense {
 }
 
 // ── Monthly Financial Snapshots ───────────────────────────────────
-// Saved once per month (manually or auto) to keep a permanent record
 export interface MonthlySnapshot {
   id: string;
-  monthKey: string;          // "YYYY-MM"
-  label: string;             // e.g. "May 2025"
-  savedAt: string;           // ISO timestamp
-
-  // Business
+  monthKey: string;
+  label: string;
+  savedAt: string;
   businessIncome: number;
   businessAdSpend: number;
   businessCosts: number;
   businessProfit: number;
-  devIncome: number;         // dev payments received that month
-
-  // Personal
+  devIncome: number;
   personalIncome: number;
   personalExpenses: number;
   personalUnforeseen: number;
   personalBalance: number;
-
-  notes: string;             // optional memo for that month
+  notes: string;
 }
 
 // ── Meeting Notes ─────────────────────────────────────────────────
 export interface MeetingNote {
   id: string;
-  date: string;              // YYYY-MM-DD
+  date: string;
   customerName: string;
-  title: string;             // short title / subject
-  notes: string;             // full notes
-  followUp: string;          // action items / follow-up
+  title: string;
+  notes: string;
+  followUp: string;
   createdAt: string;
   updatedAt: string;
 }

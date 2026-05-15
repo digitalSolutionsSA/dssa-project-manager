@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Client, Task, CalendarEvent, CostItem, DevProject,
+  Client, Task, TaskStatus, CalendarEvent, CostItem, DevProject,
   BudgetIncomeItem, BudgetExpenseItem, UnforeseenExpense,
   BudgetIncomeCategory, BudgetExpenseCategory,
   OnceOffCost, MonthlySnapshot, MeetingNote,
@@ -91,10 +91,22 @@ async function fbPush(key: string, val: unknown) {
   } catch(e){ console.warn('Firebase push failed:',e); }
 }
 
+// ── Task migration (completed:boolean → status:TaskStatus) ────────
+function migrateTasks(tasks: Task[]): Task[] {
+  return tasks.map(t => ({
+    ...t,
+    status: t.status ?? ((t.completed) ? 'completed' : 'not-started'),
+    completed: undefined,
+  }));
+}
+function migrateClients(clients: Client[]): Client[] {
+  return clients.map(c => ({ ...c, tasks: migrateTasks(c.tasks) }));
+}
+
 // ── Defaults ──────────────────────────────────────────────────────
 const DEFAULT_CLIENTS: Client[] = [{
   id: genId(), name:'Loka Three Rivers', color:'#3b82f6', icon:'🔥',
-  tasks:[{id:genId(),title:'Create Best of Vaal ad',dueDate:todayStr(),completed:false,createdAt:new Date().toISOString()}],
+  tasks:[{id:genId(),title:'Create Best of Vaal ad',dueDate:todayStr(),status:'not-started',createdAt:new Date().toISOString()}],
   monthlyIncome:15000,adSpend:3000,monthlyCost:2000,
 }];
 const DEFAULT_COSTS: CostItem[] = [
@@ -106,7 +118,7 @@ const DEFAULT_COSTS: CostItem[] = [
 // MAIN STORE
 // ══════════════════════════════════════════════════════════════════
 export function useStore() {
-  const [clients,setClients]                     = useState<Client[]>(()=>load(K.clients,DEFAULT_CLIENTS));
+  const [clients,setClients]                     = useState<Client[]>(()=>migrateClients(load(K.clients,DEFAULT_CLIENTS)));
   const [events,setEvents]                       = useState<CalendarEvent[]>(()=>load(K.events,[]));
   const [costs,setCosts]                         = useState<CostItem[]>(()=>load(K.costs,DEFAULT_COSTS));
   const [devProjects,setDevProjects]             = useState<DevProject[]>(()=>load(K.devProjects,[]));
@@ -153,7 +165,7 @@ export function useStore() {
     const db=getFirebaseDb();
     if(!db)return;
     const setters:{[k:string]:(v:unknown)=>void}={
-      clients:(v)=>setClients(v as Client[]),
+      clients:(v)=>setClients(migrateClients(v as Client[])),
       events:(v)=>setEvents(v as CalendarEvent[]),
       costs:(v)=>setCosts(v as CostItem[]),
       devProjects:(v)=>setDevProjects(v as DevProject[]),
@@ -197,14 +209,18 @@ export function useStore() {
     setClients(p=>p.map(c=>c.id===id?{...c,[field]:value}:c));
 
   // ── TASKS ─────────────────────────────────────────────────────────
-  const addTask=(cid:string,title:string,dueDate:string)=>
-    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:[...c.tasks,{id:genId(),title,dueDate,completed:false,createdAt:new Date().toISOString()}]}:c));
+  const addTask=(cid:string,title:string,dueDate:string,assignedTo?:string)=>
+    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:[...c.tasks,{id:genId(),title,dueDate,status:'not-started' as TaskStatus,assignedTo,createdAt:new Date().toISOString()}]}:c));
   const toggleTask=(cid:string,tid:string)=>
-    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,completed:!t.completed}:t)}:c));
+    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,status:(t.status==='completed'?'not-started':'completed') as TaskStatus}:t)}:c));
   const deleteTask=(cid:string,tid:string)=>
     setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.filter(t=>t.id!==tid)}:c));
   const editTask=(cid:string,tid:string,title:string,dueDate:string)=>
     setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,title,dueDate}:t)}:c));
+  const assignTask=(cid:string,tid:string,userId:string|undefined)=>
+    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,assignedTo:userId}:t)}:c));
+  const updateTaskStatus=(cid:string,tid:string,status:TaskStatus)=>
+    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,status}:t)}:c));
 
   // ── BUSINESS COSTS ────────────────────────────────────────────────
   const addCost=(name:string,amount:number,category:string)=>setCosts(p=>[...p,{id:genId(),name,amount,category}]);
@@ -335,7 +351,7 @@ export function useStore() {
 
   const overdueCount = clients.reduce((n,c)=>{
     const t=todayStr();
-    return n+c.tasks.filter(tk=>!tk.completed&&tk.dueDate<t).length;
+    return n+c.tasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t).length;
   },0);
 
   return {
@@ -344,7 +360,7 @@ export function useStore() {
     onceOffCosts,monthlySnapshots,meetingNotes,
     isFirebaseConfigured, fbReady, fbError,
     addClient,deleteClient,updateClientName,updateClientColor,updateClientIcon,updateClientFinancials,
-    addTask,toggleTask,deleteTask,editTask,
+    addTask,toggleTask,deleteTask,editTask,assignTask,updateTaskStatus,
     addCost,deleteCost,updateCost,
     addOnceOffCost,deleteOnceOffCost,updateOnceOffCost,toggleOnceOffPaid,
     addDevProject,deleteDevProject,updateDevProject,completeDevProject,reopenDevProject,

@@ -4,13 +4,18 @@ import {
   DollarSign, ChevronDown, ChevronUp, Zap, Clock,
   Calendar, Palette, Code2, Receipt, ChevronRight,
   CircleCheck, RefreshCw, ChevronLeft, Wallet, Wifi, WifiOff, BookOpen, History,
+  LogOut, Users,
 } from 'lucide-react';
 import { useStore, PRESET_COLORS, PRESET_ICONS, EVENT_COLORS, COST_CATEGORIES, todayStr } from './useStore';
-import { Client, Task, CalendarEvent, CostItem, DevProject, DevTask } from './types';
+import { useAuth } from './useAuth';
+import { Client, Task, AppUser, CalendarEvent, CostItem, DevProject, DevTask } from './types';
 import PersonalBudget from './PersonalBudget';
 import OnceOffCosts from './OnceOffCosts';
 import MonthlyHistory from './MonthlyHistory';
 import MeetingNotes from './MeetingNotes';
+import LoginScreen from './LoginScreen';
+import AssistantView from './AssistantView';
+import UserManagement from './UserManagement';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function addDays(base: Date, n: number) { const d = new Date(base); d.setDate(d.getDate() + n); return d; }
@@ -20,8 +25,8 @@ function fmt12(t: string) {
   const [h, m] = t.split(':').map(Number);
   return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
-function isOverdue(t: Task) { return !t.completed && t.dueDate < todayStr(); }
-function isDueToday(t: Task) { return !t.completed && t.dueDate === todayStr(); }
+function isOverdue(t: Task) { return t.status !== 'completed' && t.dueDate < todayStr(); }
+function isDueToday(t: Task) { return t.status !== 'completed' && t.dueDate === todayStr(); }
 function fmtR(n: number) { return 'R\u00a0' + n.toLocaleString('en-ZA'); }
 
 const DAY_SHORT   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -691,8 +696,8 @@ function DevProjectCard({ project, onDelete, onUpdate, onComplete, onReopen,
 // ══════════════════════════════════════════════════════════════════
 // TASK ROW (retainer)
 // ══════════════════════════════════════════════════════════════════
-function TaskRow({ task, clientColor, onToggle, onDelete, onEdit, onOverdueClick }: {
-  task: Task; clientColor: string;
+function TaskRow({ task, clientColor, users, onToggle, onDelete, onEdit, onOverdueClick }: {
+  task: Task; clientColor: string; users?: AppUser[];
   onToggle: () => void; onDelete: () => void;
   onEdit: (title: string, d: string) => void; onOverdueClick: () => void;
 }) {
@@ -713,13 +718,21 @@ function TaskRow({ task, clientColor, onToggle, onDelete, onEdit, onOverdueClick
     </div>
   );
 
+  const done = task.status === 'completed';
   return (
-    <div className={`task-row ${task.completed ? 'done' : ''} ${over ? 'overdue' : ''} ${dToday ? 'due-today' : ''}`}
+    <div className={`task-row ${done ? 'done' : ''} ${over ? 'overdue' : ''} ${dToday ? 'due-today' : ''}`}
       style={{ borderLeftColor: clientColor }}>
-      <button className={`task-check ${task.completed ? 'checked' : ''}`}
-        style={task.completed ? { background: clientColor, borderColor: clientColor } : { borderColor: clientColor }}
-        onClick={onToggle}>{task.completed && <Check size={12} strokeWidth={3} />}</button>
+      <button className={`task-check ${done ? 'checked' : ''}`}
+        style={done ? { background: clientColor, borderColor: clientColor } : { borderColor: clientColor }}
+        onClick={onToggle}>{done && <Check size={12} strokeWidth={3} />}</button>
       <span className="task-title">{task.title}</span>
+      {task.assignedTo && users && (
+        <span className="task-assigned-badge">
+          {users.find(u => u.id === task.assignedTo)?.displayName
+            || users.find(u => u.id === task.assignedTo)?.username
+            || '?'}
+        </span>
+      )}
       <span className="task-date">{task.dueDate}</span>
       {over   && <button className="badge-overdue" onClick={onOverdueClick}><AlertTriangle size={11} /> Late</button>}
       {dToday && <span className="badge-today">Today</span>}
@@ -729,11 +742,21 @@ function TaskRow({ task, clientColor, onToggle, onDelete, onEdit, onOverdueClick
   );
 }
 
-function AddTaskForm({ clientColor, onAdd }: { clientColor: string; onAdd: (t: string, d: string) => void }) {
-  const [open, setOpen]   = useState(false);
-  const [title, setTitle] = useState('');
-  const [date, setDate]   = useState(todayStr());
-  const go = () => { if (title.trim()) { onAdd(title.trim(), date); setTitle(''); setDate(todayStr()); setOpen(false); } };
+function AddTaskForm({ clientColor, assistants, onAdd }: {
+  clientColor: string;
+  assistants: AppUser[];
+  onAdd: (t: string, d: string, assignedTo?: string) => void;
+}) {
+  const [open, setOpen]         = useState(false);
+  const [title, setTitle]       = useState('');
+  const [date, setDate]         = useState(todayStr());
+  const [assignedTo, setAssignedTo] = useState<string>('');
+  const go = () => {
+    if (title.trim()) {
+      onAdd(title.trim(), date, assignedTo || undefined);
+      setTitle(''); setDate(todayStr()); setAssignedTo(''); setOpen(false);
+    }
+  };
   if (!open) return (
     <button className="btn-add-task" style={{ borderColor: clientColor, color: clientColor }} onClick={() => setOpen(true)}>
       <Plus size={14} /> Add Task
@@ -744,6 +767,12 @@ function AddTaskForm({ clientColor, onAdd }: { clientColor: string; onAdd: (t: s
       <input className="field-input flex1" placeholder="Task title..." value={title}
         onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} autoFocus />
       <input type="date" className="field-date" value={date} onChange={e => setDate(e.target.value)} />
+      {assistants.length > 0 && (
+        <select className="field-date task-assign-select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>
+          <option value="">Unassigned</option>
+          {assistants.map(u => <option key={u.id} value={u.id}>{u.displayName || u.username}</option>)}
+        </select>
+      )}
       <button className="icon-btn accent" onClick={go}><Check size={14} /></button>
       <button className="icon-btn" onClick={() => setOpen(false)}><X size={14} /></button>
     </div>
@@ -780,14 +809,14 @@ function FinancialsPanel({ client, onUpdate }: {
 // ══════════════════════════════════════════════════════════════════
 // CLIENT CARD
 // ══════════════════════════════════════════════════════════════════
-function ClientCard({ client, onDeleteClient, onUpdateName, onUpdateColor, onUpdateIcon,
+function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, onUpdateColor, onUpdateIcon,
   onUpdateFinancials, onAddTask, onToggleTask, onDeleteTask, onEditTask
 }: {
-  client: Client;
+  client: Client; users: AppUser[]; assistants: AppUser[];
   onDeleteClient: () => void; onUpdateName: (n: string) => void;
   onUpdateColor: (c: string) => void; onUpdateIcon: (i: string) => void;
   onUpdateFinancials: (f: 'monthlyIncome' | 'adSpend' | 'monthlyCost', v: number) => void;
-  onAddTask: (t: string, d: string) => void; onToggleTask: (id: string) => void;
+  onAddTask: (t: string, d: string, uid?: string) => void; onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void; onEditTask: (id: string, t: string, d: string) => void;
 }) {
   const [collapsed, setCollapsed]       = useState(false);
@@ -797,8 +826,8 @@ function ClientCard({ client, onDeleteClient, onUpdateName, onUpdateColor, onUpd
   const [nameVal, setNameVal]           = useState(client.name);
   const [alertTask, setAlertTask]       = useState<Task | null>(null);
   const overdueTasks = client.tasks.filter(isOverdue);
-  const pending = client.tasks.filter(t => !t.completed).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  const done    = client.tasks.filter(t => t.completed);
+  const pending = client.tasks.filter(t => t.status !== 'completed').sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const done    = client.tasks.filter(t => t.status === 'completed');
   const saveName = () => { if (nameVal.trim()) onUpdateName(nameVal.trim()); setEditingName(false); };
 
   return (
@@ -833,7 +862,7 @@ function ClientCard({ client, onDeleteClient, onUpdateName, onUpdateColor, onUpd
             <div className="task-list">
               {pending.length === 0 && done.length === 0 && <p className="empty-msg">No tasks yet — add one below</p>}
               {pending.map(t => (
-                <TaskRow key={t.id} task={t} clientColor={client.color}
+                <TaskRow key={t.id} task={t} clientColor={client.color} users={users}
                   onToggle={() => onToggleTask(t.id)} onDelete={() => onDeleteTask(t.id)}
                   onEdit={(ti, d) => onEditTask(t.id, ti, d)} onOverdueClick={() => setAlertTask(t)} />
               ))}
@@ -841,14 +870,14 @@ function ClientCard({ client, onDeleteClient, onUpdateName, onUpdateColor, onUpd
                 <details className="done-section">
                   <summary>Completed ({done.length})</summary>
                   {done.map(t => (
-                    <TaskRow key={t.id} task={t} clientColor={client.color}
+                    <TaskRow key={t.id} task={t} clientColor={client.color} users={users}
                       onToggle={() => onToggleTask(t.id)} onDelete={() => onDeleteTask(t.id)}
                       onEdit={(ti, d) => onEditTask(t.id, ti, d)} onOverdueClick={() => setAlertTask(t)} />
                   ))}
                 </details>
               )}
             </div>
-            <AddTaskForm clientColor={client.color} onAdd={onAddTask} />
+            <AddTaskForm clientColor={client.color} assistants={assistants} onAdd={onAddTask} />
           </div>
         )}
       </div>
@@ -893,10 +922,42 @@ function SummaryBar({ totalIncome, totalAdSpend, totalCosts, totalPending, total
 // APP
 // ══════════════════════════════════════════════════════════════════
 export default function App() {
+  const auth = useAuth();
+
+  // Show login screen while loading or if not authenticated
+  if (auth.isLoading) return (
+    <div className="app-loading">
+      <div className="app-loading-spinner" />
+    </div>
+  );
+  if (!auth.currentUser) return (
+    <LoginScreen onLogin={auth.login} error={auth.authError} />
+  );
+  // Assistant role — show simplified task board only
+  if (auth.currentUser.role === 'assistant') {
+    return <AssistantViewWrapper auth={auth} />;
+  }
+  return <AdminApp auth={auth} />;
+}
+
+// Wrapper so AssistantView can get store data
+function AssistantViewWrapper({ auth }: { auth: ReturnType<typeof useAuth> }) {
+  const { clients, updateTaskStatus } = useStore();
+  return (
+    <AssistantView
+      currentUser={auth.currentUser!}
+      clients={clients}
+      onUpdateStatus={updateTaskStatus}
+      onLogout={auth.logout}
+    />
+  );
+}
+
+function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const {
     clients, addClient, deleteClient,
     updateClientName, updateClientColor, updateClientIcon, updateClientFinancials,
-    addTask, toggleTask, deleteTask, editTask,
+    addTask, toggleTask, deleteTask, editTask, assignTask, updateTaskStatus,
     costs, addCost, deleteCost, updateCost,
     devProjects, addDevProject, deleteDevProject, updateDevProject,
     completeDevProject, reopenDevProject, updateDevProjectColor, updateDevProjectIcon,
@@ -922,7 +983,8 @@ export default function App() {
   const [showAddDev, setShowAddDev]       = useState(false);
   const [newDevClient, setNewDevClient]   = useState('');
   const [newDevProject, setNewDevProject] = useState('');
-  const [activeTab, setActiveTab]         = useState<'retainer' | 'dev' | 'calendar' | 'budget' | 'history' | 'notes'>('retainer');
+  const [activeTab, setActiveTab]         = useState<'retainer' | 'dev' | 'calendar' | 'budget' | 'history' | 'notes' | 'users'>('retainer');
+  const assistants = auth.users.filter(u => u.role === 'assistant');
   const clientInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (showAddClient) clientInputRef.current?.focus(); }, [showAddClient]);
@@ -966,6 +1028,10 @@ export default function App() {
               {!isFirebaseConfigured ? 'Local' : fbError ? 'Sync Error' : fbReady ? 'Synced' : 'Syncing…'}
             </span>
           </div>
+          <button className="btn-logout" onClick={auth.logout} title="Logout">
+            <LogOut size={14} />
+            <span className="btn-logout-label">{auth.currentUser?.displayName || auth.currentUser?.username}</span>
+          </button>
           {overdueCount > 0 && (
             <div className="header-overdue">
               <Zap size={14} /> {overdueCount}
@@ -1014,6 +1080,10 @@ export default function App() {
         <button className={`tab-btn ${activeTab === 'notes' ? 'active' : ''}`} onClick={() => setActiveTab('notes')}>
           <BookOpen size={15} /><span className="tab-label"> Notes</span>
         </button>
+        <button className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+          <Users size={15} /><span className="tab-label"> Users</span>
+          {auth.users.length > 0 && <span className="tab-count">{auth.users.length}</span>}
+        </button>
       </div>
 
       {/* RETAINER TAB */}
@@ -1023,12 +1093,13 @@ export default function App() {
           <main className="client-grid">
             {clients.map(c => (
               <ClientCard key={c.id} client={c}
+                users={auth.users} assistants={assistants}
                 onDeleteClient={() => deleteClient(c.id)}
                 onUpdateName={n => updateClientName(c.id, n)}
                 onUpdateColor={col => updateClientColor(c.id, col)}
                 onUpdateIcon={i => updateClientIcon(c.id, i)}
                 onUpdateFinancials={(f, v) => updateClientFinancials(c.id, f, v)}
-                onAddTask={(t, d) => addTask(c.id, t, d)}
+                onAddTask={(t, d, uid) => addTask(c.id, t, d, uid)}
                 onToggleTask={tid => toggleTask(c.id, tid)}
                 onDeleteTask={tid => deleteTask(c.id, tid)}
                 onEditTask={(tid, t, d) => editTask(c.id, tid, t, d)} />
@@ -1152,6 +1223,17 @@ export default function App() {
           onAdd={addMeetingNote}
           onDelete={deleteMeetingNote}
           onUpdate={updateMeetingNote}
+        />
+      )}
+
+      {/* USERS TAB */}
+      {activeTab === 'users' && (
+        <UserManagement
+          users={auth.users}
+          currentUserId={auth.currentUser!.id}
+          onAddUser={auth.addUser}
+          onDeleteUser={auth.deleteUser}
+          onChangePin={auth.changePin}
         />
       )}
 
