@@ -228,7 +228,12 @@ export function useStore() {
   };
   const deleteClient=(id:string)=>setClients(p=>p.filter(c=>c.id!==id));
   const toggleClientPaid=(id:string)=>setClients(p=>p.map(c=>c.id===id?{...c,paidThisMonth:!c.paidThisMonth}:c));
-  const resetMonthlyPayments=()=>setClients(p=>p.map(c=>({...c,paidThisMonth:false})));
+  const resetMonthlyPayments=()=>{
+    setClients(p=>p.map(c=>({...c,paidThisMonth:false,adSpendPaid:false})));
+    setCosts(p=>p.map(c=>({...c,paid:false})));
+    setBudgetIncome(p=>p.map(i=>({...i,paid:false})));
+    setBudgetExpenses(p=>p.map(e=>({...e,paid:false})));
+  };
   const updateClientName=(id:string,name:string)=>setClients(p=>p.map(c=>c.id===id?{...c,name}:c));
   const updateClientColor=(id:string,color:string)=>setClients(p=>p.map(c=>c.id===id?{...c,color}:c));
   const updateClientIcon=(id:string,icon:string)=>setClients(p=>p.map(c=>c.id===id?{...c,icon}:c));
@@ -250,9 +255,11 @@ export function useStore() {
     setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,status}:t)}:c));
 
   // ── BUSINESS COSTS ────────────────────────────────────────────────
-  const addCost=(name:string,amount:number,category:string)=>setCosts(p=>[...p,{id:genId(),name,amount,category}]);
+  const addCost=(name:string,amount:number,category:string)=>setCosts(p=>[...p,{id:genId(),name,amount,category,paid:false}]);
   const deleteCost=(id:string)=>setCosts(p=>p.filter(c=>c.id!==id));
   const updateCost=(id:string,name:string,amount:number,category:string)=>setCosts(p=>p.map(c=>c.id===id?{...c,name,amount,category}:c));
+  const toggleCostPaid=(id:string)=>setCosts(p=>p.map(c=>c.id===id?{...c,paid:!c.paid}:c));
+  const toggleClientAdSpendPaid=(id:string)=>setClients(p=>p.map(c=>c.id===id?{...c,adSpendPaid:!c.adSpendPaid}:c));
 
   // ── ONCE-OFF COSTS ────────────────────────────────────────────────
   const addOnceOffCost=(name:string,amount:number,dueDate:string,notes:string)=>
@@ -291,16 +298,18 @@ export function useStore() {
 
   // ── PERSONAL BUDGET ───────────────────────────────────────────────
   const addBudgetIncome=(name:string,amount:number,category:BudgetIncomeCategory,recurring:boolean)=>
-    setBudgetIncome(p=>[...p,{id:genId(),name,amount,category,recurring}]);
+    setBudgetIncome(p=>[...p,{id:genId(),name,amount,category,recurring,paid:false}]);
   const deleteBudgetIncome=(id:string)=>setBudgetIncome(p=>p.filter(i=>i.id!==id));
   const updateBudgetIncome=(id:string,name:string,amount:number,category:BudgetIncomeCategory,recurring:boolean)=>
     setBudgetIncome(p=>p.map(i=>i.id===id?{...i,name,amount,category,recurring}:i));
+  const toggleBudgetIncomePaid=(id:string)=>setBudgetIncome(p=>p.map(i=>i.id===id?{...i,paid:!i.paid}:i));
 
   const addBudgetExpense=(name:string,amount:number,category:BudgetExpenseCategory,recurring:boolean)=>
-    setBudgetExpenses(p=>[...p,{id:genId(),name,amount,category,recurring}]);
+    setBudgetExpenses(p=>[...p,{id:genId(),name,amount,category,recurring,paid:false}]);
   const deleteBudgetExpense=(id:string)=>setBudgetExpenses(p=>p.filter(e=>e.id!==id));
   const updateBudgetExpense=(id:string,name:string,amount:number,category:BudgetExpenseCategory,recurring:boolean)=>
     setBudgetExpenses(p=>p.map(e=>e.id===id?{...e,name,amount,category,recurring}:e));
+  const toggleBudgetExpensePaid=(id:string)=>setBudgetExpenses(p=>p.map(e=>e.id===id?{...e,paid:!e.paid}:e));
 
   const addUnforeseen=(name:string,amount:number,date:string,notes:string)=>
     setUnforeseen(p=>[...p,{id:genId(),name,amount,date,notes,paid:false}]);
@@ -355,23 +364,30 @@ export function useStore() {
   const totalMonthlyIncome  = clients.reduce((s,c)=>s+c.monthlyIncome,0);
   const totalReceivedIncome = clients.filter(c=>c.paidThisMonth).reduce((s,c)=>s+c.monthlyIncome,0);
   const totalAdSpend        = clients.reduce((s,c)=>s+c.adSpend,0);
+  const totalPaidAdSpend    = clients.filter(c=>c.adSpendPaid).reduce((s,c)=>s+c.adSpend,0);
   const totalMonthlyCosts   = costs.reduce((s,c)=>s+c.amount,0);
+  const totalPaidMonthlyCosts = costs.filter(c=>c.paid).reduce((s,c)=>s+c.amount,0);
   const totalClientCosts    = clients.reduce((s,c)=>s+c.monthlyCost,0);
   const totalOnceOffUnpaid  = onceOffCosts.filter(c=>!c.paid).reduce((s,c)=>s+c.amount,0);
-  const totalCosts          = totalMonthlyCosts + totalClientCosts + totalOnceOffUnpaid;
+  const totalOnceOffPaid    = onceOffCosts.filter(c=>c.paid).reduce((s,c)=>s+c.amount,0);
+  const totalCosts          = totalMonthlyCosts + totalClientCosts + totalAdSpend + totalOnceOffUnpaid;
   const totalPendingIncome  = devProjects.reduce((s,p)=>{
     let pending=0;
     if(!p.depositPaid)pending+=p.depositAmount;
     if(!p.finalPaid)  pending+=p.finalAmount;
     return s+pending;
   },0);
-  const totalProfit         = totalMonthlyIncome - totalAdSpend - totalCosts;
-  const businessBalance     = currentBalance + totalReceivedIncome - totalCosts;
+  const totalProfit         = totalMonthlyIncome - totalAdSpend - totalMonthlyCosts - totalClientCosts;
+  // Available balance only deducts costs/ad-spend that have actually been paid out
+  const businessBalance     = currentBalance + totalReceivedIncome - totalPaidAdSpend - totalPaidMonthlyCosts - totalClientCosts - totalOnceOffPaid;
 
-  const totalBudgetIncome   = budgetIncome.reduce((s,i)=>s+i.amount,0);
-  const totalBudgetExpenses = budgetExpenses.reduce((s,e)=>s+e.amount,0);
-  const totalUnforeseen     = unforeseenExpenses.filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0);
-  const budgetBalance       = totalBudgetIncome - totalBudgetExpenses - totalUnforeseen;
+  const totalBudgetIncome      = budgetIncome.reduce((s,i)=>s+i.amount,0);
+  const totalPaidBudgetIncome  = budgetIncome.filter(i=>i.paid).reduce((s,i)=>s+i.amount,0);
+  const totalBudgetExpenses    = budgetExpenses.reduce((s,e)=>s+e.amount,0);
+  const totalPaidBudgetExpenses= budgetExpenses.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
+  const totalUnforeseen        = unforeseenExpenses.filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0);
+  // Budget balance uses paid/received amounts so it stays accurate to what has actually moved
+  const budgetBalance          = totalPaidBudgetIncome - totalPaidBudgetExpenses - totalUnforeseen;
 
   // Cumulative totals across all snapshots
   const allTimeBusinessIncome  = monthlySnapshots.reduce((s,sn)=>s+sn.businessIncome+sn.devIncome,0);
@@ -390,23 +406,29 @@ export function useStore() {
     currentBalance, setCurrentBalance,
     isFirebaseConfigured, fbReady, fbError,
     addClient,deleteClient,updateClientName,updateClientColor,updateClientIcon,updateClientFinancials,
-    toggleClientPaid, resetMonthlyPayments,
+    toggleClientPaid, toggleClientAdSpendPaid, resetMonthlyPayments,
     addTask,toggleTask,deleteTask,editTask,assignTask,updateTaskStatus,
-    addCost,deleteCost,updateCost,
+    addCost,deleteCost,updateCost,toggleCostPaid,
     addOnceOffCost,deleteOnceOffCost,updateOnceOffCost,toggleOnceOffPaid,
     addDevProject,deleteDevProject,updateDevProject,completeDevProject,reopenDevProject,
     updateDevProjectColor,updateDevProjectIcon,
     addDevTask,toggleDevTask,deleteDevTask,editDevTask,
     addSubTask,toggleSubTask,deleteSubTask,
     addEvent,deleteEvent,editEvent,eventsForDate,
-    addBudgetIncome,deleteBudgetIncome,updateBudgetIncome,
-    addBudgetExpense,deleteBudgetExpense,updateBudgetExpense,
+    addBudgetIncome,deleteBudgetIncome,updateBudgetIncome,toggleBudgetIncomePaid,
+    addBudgetExpense,deleteBudgetExpense,updateBudgetExpense,toggleBudgetExpensePaid,
     addUnforeseen,deleteUnforeseen,updateUnforeseen,toggleUnforeseenPaid,
     saveMonthSnapshot,deleteSnapshot,updateSnapshotNotes,
     addMeetingNote,deleteMeetingNote,updateMeetingNote,
-    totalMonthlyIncome,totalReceivedIncome,totalAdSpend,totalCosts,totalMonthlyCosts,totalClientCosts,
-    totalOnceOffUnpaid,totalPendingIncome,totalProfit,businessBalance,
-    totalBudgetIncome,totalBudgetExpenses,totalUnforeseen,budgetBalance,
+    totalMonthlyIncome,totalReceivedIncome,
+    totalAdSpend,totalPaidAdSpend,
+    totalMonthlyCosts,totalPaidMonthlyCosts,
+    totalClientCosts,
+    totalOnceOffUnpaid,totalOnceOffPaid,
+    totalCosts,totalPendingIncome,totalProfit,businessBalance,
+    totalBudgetIncome,totalPaidBudgetIncome,
+    totalBudgetExpenses,totalPaidBudgetExpenses,
+    totalUnforeseen,budgetBalance,
     allTimeBusinessIncome,allTimeBusinessProfit,allTimePersonalBalance,
     overdueCount,
   };

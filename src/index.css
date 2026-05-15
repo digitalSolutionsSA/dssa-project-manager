@@ -162,6 +162,30 @@ body {
 .cost-amount { font-family: var(--mono); font-size: 0.9rem; font-weight: 600; color: var(--text2); flex-shrink: 0; }
 .costs-list  { }
 
+/* ── PAID TOGGLE BUTTON (shared across costs, budget, ad spend) ─── */
+.paid-toggle-btn {
+  width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border3);
+  background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.15s; color: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.paid-toggle-btn:hover { border-color: var(--green); background: rgba(16,185,129,0.1); }
+.paid-toggle-btn.paid { background: var(--green); border-color: var(--green); color: #fff; }
+.paid-toggle-btn.paid.income-paid { background: #3b82f6; border-color: #3b82f6; }
+.paid-toggle-btn.paid:hover { opacity: 0.8; }
+
+/* Muted row style for paid cost/budget items */
+.cost-paid { opacity: 0.6; }
+.cost-paid .cost-name { text-decoration: line-through; text-decoration-color: var(--text4); }
+.budget-row-paid { opacity: 0.65; }
+.budget-row-paid .budget-item-name { text-decoration: line-through; text-decoration-color: var(--text4); }
+
+/* "paid / total" secondary label in section headers */
+.section-total-of { font-size: 0.75rem; font-weight: 500; opacity: 0.55; }
+
+/* "received / expected" sub-label in budget summary cards */
+.budget-summary-sub { font-size: 0.75rem; color: var(--text3); margin-top: 2px; }
+
 /* ── TAB NAV ────────────────────────────────────────────────────── */
 .tab-nav {
   display: flex; gap: 0;

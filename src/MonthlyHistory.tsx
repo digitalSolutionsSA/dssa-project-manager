@@ -1,8 +1,83 @@
 import { useState } from 'react';
-import { Save, Trash2, Edit3, Check, X, TrendingUp, BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Trash2, Edit3, Check, X, TrendingUp, BarChart3, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
 import { MonthlySnapshot } from './types';
 
 function fmtR(n: number) { return 'R\u00a0' + n.toLocaleString('en-ZA'); }
+
+// \u2500\u2500 PDF Export \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function exportSnapshotToPdf(snap: MonthlySnapshot) {
+  const netBusiness = snap.businessProfit + snap.devIncome;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Financial Report \u2014 ${snap.label}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #1a1a2e; padding: 40px; font-size: 13px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #1a1a2e; }
+  .subtitle { color: #64748b; font-size: 12px; margin-bottom: 28px; }
+  .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; border-bottom: 2px solid #6c63ff; padding-bottom: 16px; }
+  .biz-name { font-size: 18px; font-weight: 700; color: #6c63ff; }
+  .report-label { font-size: 13px; color: #64748b; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+  .section { background: #f8f9fc; border-radius: 10px; padding: 18px; }
+  .section h2 { font-size: 14px; font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; color: #6c63ff; letter-spacing: 0.5px; text-transform: uppercase; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #eef0f5; }
+  .row:last-child { border: none; }
+  .row.total { margin-top: 8px; padding-top: 10px; border-top: 2px solid #6c63ff; font-weight: 700; font-size: 14px; }
+  .income { color: #10b981; font-weight: 600; }
+  .expense { color: #ef4444; font-weight: 600; }
+  .profit-pos { color: #10b981; font-weight: 700; }
+  .profit-neg { color: #ef4444; font-weight: 700; }
+  .notes-section { background: #f8f9fc; border-radius: 10px; padding: 18px; margin-bottom: 24px; }
+  .notes-section h2 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: #6c63ff; }
+  .notes-text { color: #475569; line-height: 1.6; }
+  .footer { color: #94a3b8; font-size: 11px; text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  @media print { body { padding: 20px; } }
+</style>
+</head>
+<body>
+  <div class="logo-row">
+    <div>
+      <div class="biz-name">Digital Solutions SA</div>
+      <div class="report-label">Monthly Financial Report</div>
+    </div>
+  </div>
+  <h1>${snap.label}</h1>
+  <div class="subtitle">Saved on ${new Date(snap.savedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+
+  <div class="cols">
+    <div class="section">
+      <h2>Business</h2>
+      <div class="row"><span>Retainer Income</span><span class="income">${fmtR(snap.businessIncome)}</span></div>
+      <div class="row"><span>Dev Income (received)</span><span class="income">${fmtR(snap.devIncome)}</span></div>
+      <div class="row"><span>Ad Spend</span><span class="expense">${fmtR(snap.businessAdSpend)}</span></div>
+      <div class="row"><span>Monthly Costs</span><span class="expense">${fmtR(snap.businessCosts)}</span></div>
+      <div class="row total"><span>Net Business Profit</span><span class="${netBusiness >= 0 ? 'profit-pos' : 'profit-neg'}">${fmtR(netBusiness)}</span></div>
+    </div>
+    <div class="section">
+      <h2>Personal Budget</h2>
+      <div class="row"><span>Income Received</span><span class="income">${fmtR(snap.personalIncome)}</span></div>
+      <div class="row"><span>Expenses Paid</span><span class="expense">${fmtR(snap.personalExpenses)}</span></div>
+      <div class="row"><span>Unforeseen Expenses</span><span class="expense">${fmtR(snap.personalUnforeseen)}</span></div>
+      <div class="row total"><span>Net Personal Balance</span><span class="${snap.personalBalance >= 0 ? 'profit-pos' : 'profit-neg'}">${fmtR(snap.personalBalance)}</span></div>
+    </div>
+  </div>
+
+  ${snap.notes ? `<div class="notes-section"><h2>Month Notes</h2><p class="notes-text">${snap.notes.replace(/\n/g, '<br/>')}</p></div>` : ''}
+
+  <div class="footer">
+    Digital Solutions SA &mdash; Generated ${new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}
+  </div>
+
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (w) { w.document.write(html); w.document.close(); }
+}
 
 function SnapshotCard({ snap, onDelete, onUpdateNotes }: {
   snap: MonthlySnapshot;
@@ -33,6 +108,9 @@ function SnapshotCard({ snap, onDelete, onUpdateNotes }: {
           </span>
         </div>
         <div className="snapshot-actions" onClick={e => e.stopPropagation()}>
+          <button className="icon-btn xs" title="Export to PDF" onClick={() => exportSnapshotToPdf(snap)}>
+            <FileDown size={13} />
+          </button>
           <button className="icon-btn xs red-h" onClick={onDelete}><Trash2 size={13} /></button>
           <button className="icon-btn xs">{expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
         </div>

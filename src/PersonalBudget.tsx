@@ -19,10 +19,11 @@ const EXPENSE_CAT_COLORS: Record<string, string> = {
 };
 
 // ── INLINE EDITABLE ROW ───────────────────────────────────────────
-function IncomeRow({ item, onDelete, onUpdate }: {
+function IncomeRow({ item, onDelete, onUpdate, onTogglePaid }: {
   item: BudgetIncomeItem;
   onDelete: () => void;
   onUpdate: (name: string, amount: number, category: BudgetIncomeCategory, recurring: boolean) => void;
+  onTogglePaid: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName]       = useState(item.name);
@@ -50,22 +51,31 @@ function IncomeRow({ item, onDelete, onUpdate }: {
   );
 
   return (
-    <div className="budget-row">
+    <div className={`budget-row ${item.paid ? 'budget-row-paid' : ''}`}>
+      <button
+        className={`paid-toggle-btn ${item.paid ? 'paid income-paid' : ''}`}
+        onClick={onTogglePaid}
+        title={item.paid ? 'Mark as not yet received' : 'Mark as received'}
+      >
+        {item.paid ? <Check size={11} strokeWidth={3} /> : null}
+      </button>
       <span className="budget-cat-dot" style={{ background: dot }} />
       <span className="budget-item-name">{item.name}</span>
       <span className="budget-cat-tag" style={{ color: dot, borderColor: dot + '40', background: dot + '18' }}>{item.category}</span>
       {item.recurring && <span className="budget-recurring-tag">Monthly</span>}
-      <span className="budget-amount income-amount">{fmtR(item.amount)}</span>
+      {item.paid && <span className="badge-paid">Received</span>}
+      <span className={`budget-amount ${item.paid ? 'paid-amount' : 'income-amount'}`}>{fmtR(item.amount)}</span>
       <button className="icon-btn xs" onClick={() => setEditing(true)}><Edit3 size={13} /></button>
       <button className="icon-btn xs red-h" onClick={onDelete}><Trash2 size={13} /></button>
     </div>
   );
 }
 
-function ExpenseRow({ item, onDelete, onUpdate }: {
+function ExpenseRow({ item, onDelete, onUpdate, onTogglePaid }: {
   item: BudgetExpenseItem;
   onDelete: () => void;
   onUpdate: (name: string, amount: number, category: BudgetExpenseCategory, recurring: boolean) => void;
+  onTogglePaid: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName]       = useState(item.name);
@@ -93,12 +103,20 @@ function ExpenseRow({ item, onDelete, onUpdate }: {
   );
 
   return (
-    <div className="budget-row">
+    <div className={`budget-row ${item.paid ? 'budget-row-paid' : ''}`}>
+      <button
+        className={`paid-toggle-btn ${item.paid ? 'paid' : ''}`}
+        onClick={onTogglePaid}
+        title={item.paid ? 'Mark as unpaid' : 'Mark as paid'}
+      >
+        {item.paid ? <Check size={11} strokeWidth={3} /> : null}
+      </button>
       <span className="budget-cat-dot" style={{ background: dot }} />
       <span className="budget-item-name">{item.name}</span>
       <span className="budget-cat-tag" style={{ color: dot, borderColor: dot + '40', background: dot + '18' }}>{item.category}</span>
       {item.recurring && <span className="budget-recurring-tag">Monthly</span>}
-      <span className="budget-amount expense-amount">{fmtR(item.amount)}</span>
+      {item.paid && <span className="badge-paid">Paid</span>}
+      <span className={`budget-amount ${item.paid ? 'paid-amount' : 'expense-amount'}`}>{fmtR(item.amount)}</span>
       <button className="icon-btn xs" onClick={() => setEditing(true)}><Edit3 size={13} /></button>
       <button className="icon-btn xs red-h" onClick={onDelete}><Trash2 size={13} /></button>
     </div>
@@ -254,10 +272,12 @@ function DonutChart({ slices, size = 120 }: { slices: { value: number; color: st
 // ── MAIN PERSONAL BUDGET COMPONENT ───────────────────────────────
 export default function PersonalBudget({
   budgetIncome, budgetExpenses, unforeseenExpenses,
-  onAddIncome, onDeleteIncome, onUpdateIncome,
-  onAddExpense, onDeleteExpense, onUpdateExpense,
+  onAddIncome, onDeleteIncome, onUpdateIncome, onToggleIncomePaid,
+  onAddExpense, onDeleteExpense, onUpdateExpense, onToggleExpensePaid,
   onAddUnforeseen, onDeleteUnforeseen, onUpdateUnforeseen, onToggleUnforeseenPaid,
-  totalBudgetIncome, totalBudgetExpenses, totalUnforeseen, budgetBalance,
+  totalBudgetIncome, totalPaidBudgetIncome,
+  totalBudgetExpenses, totalPaidBudgetExpenses,
+  totalUnforeseen, budgetBalance,
 }: {
   budgetIncome: BudgetIncomeItem[];
   budgetExpenses: BudgetExpenseItem[];
@@ -265,15 +285,19 @@ export default function PersonalBudget({
   onAddIncome: (n: string, a: number, c: BudgetIncomeCategory, r: boolean) => void;
   onDeleteIncome: (id: string) => void;
   onUpdateIncome: (id: string, n: string, a: number, c: BudgetIncomeCategory, r: boolean) => void;
+  onToggleIncomePaid: (id: string) => void;
   onAddExpense: (n: string, a: number, c: BudgetExpenseCategory, r: boolean) => void;
   onDeleteExpense: (id: string) => void;
   onUpdateExpense: (id: string, n: string, a: number, c: BudgetExpenseCategory, r: boolean) => void;
+  onToggleExpensePaid: (id: string) => void;
   onAddUnforeseen: (n: string, a: number, date: string, notes: string) => void;
   onDeleteUnforeseen: (id: string) => void;
   onUpdateUnforeseen: (id: string, n: string, a: number, date: string, notes: string) => void;
   onToggleUnforeseenPaid: (id: string) => void;
   totalBudgetIncome: number;
+  totalPaidBudgetIncome: number;
   totalBudgetExpenses: number;
+  totalPaidBudgetExpenses: number;
   totalUnforeseen: number;
   budgetBalance: number;
 }) {
@@ -312,15 +336,21 @@ export default function PersonalBudget({
         <div className="budget-summary-card income-card">
           <div className="budget-summary-icon"><TrendingUp size={20} /></div>
           <div className="budget-summary-info">
-            <span className="budget-summary-label">Total Income</span>
-            <span className="budget-summary-value income-value">{fmtR(totalBudgetIncome)}</span>
+            <span className="budget-summary-label">Income Received</span>
+            <span className="budget-summary-value income-value">{fmtR(totalPaidBudgetIncome)}</span>
+            {totalPaidBudgetIncome < totalBudgetIncome && (
+              <span className="budget-summary-sub">of {fmtR(totalBudgetIncome)} expected</span>
+            )}
           </div>
         </div>
         <div className="budget-summary-card expense-card">
           <div className="budget-summary-icon"><TrendingDown size={20} /></div>
           <div className="budget-summary-info">
-            <span className="budget-summary-label">Monthly Expenses</span>
-            <span className="budget-summary-value expense-value">{fmtR(totalBudgetExpenses)}</span>
+            <span className="budget-summary-label">Expenses Paid</span>
+            <span className="budget-summary-value expense-value">{fmtR(totalPaidBudgetExpenses)}</span>
+            {totalPaidBudgetExpenses < totalBudgetExpenses && (
+              <span className="budget-summary-sub">of {fmtR(totalBudgetExpenses)} budgeted</span>
+            )}
           </div>
         </div>
         <div className="budget-summary-card unforeseen-card">
@@ -396,7 +426,12 @@ export default function PersonalBudget({
         <div className="budget-section-head income-head">
           <TrendingUp size={16} className="section-icon" />
           <span>Income</span>
-          <span className="section-total income-total">{fmtR(totalBudgetIncome)}</span>
+          {budgetIncome.filter(i => !i.paid).length > 0 && (
+            <span className="unforeseen-badge">{budgetIncome.filter(i => !i.paid).length} pending</span>
+          )}
+          <span className="section-total income-total">
+            {fmtR(totalPaidBudgetIncome)} <span className="section-total-of">/ {fmtR(totalBudgetIncome)}</span>
+          </span>
           <button className="icon-btn" onClick={() => setShowAddIncome(p => !p)}><Plus size={16} /></button>
           <button className="icon-btn" onClick={() => setIncomeCollapsed(p => !p)}>{incomeCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
         </div>
@@ -408,7 +443,8 @@ export default function PersonalBudget({
               {budgetIncome.map(item => (
                 <IncomeRow key={item.id} item={item}
                   onDelete={() => onDeleteIncome(item.id)}
-                  onUpdate={(n, a, c, r) => onUpdateIncome(item.id, n, a, c, r)} />
+                  onUpdate={(n, a, c, r) => onUpdateIncome(item.id, n, a, c, r)}
+                  onTogglePaid={() => onToggleIncomePaid(item.id)} />
               ))}
             </div>
           </>
@@ -420,7 +456,12 @@ export default function PersonalBudget({
         <div className="budget-section-head expense-head">
           <TrendingDown size={16} className="section-icon" />
           <span>Monthly Expenses</span>
-          <span className="section-total expense-total">{fmtR(totalBudgetExpenses)}</span>
+          {budgetExpenses.filter(e => !e.paid).length > 0 && (
+            <span className="unforeseen-badge">{budgetExpenses.filter(e => !e.paid).length} unpaid</span>
+          )}
+          <span className="section-total expense-total">
+            {fmtR(totalPaidBudgetExpenses)} <span className="section-total-of">/ {fmtR(totalBudgetExpenses)}</span>
+          </span>
           <button className="icon-btn" onClick={() => setShowAddExpense(p => !p)}><Plus size={16} /></button>
           <button className="icon-btn" onClick={() => setExpenseCollapsed(p => !p)}>{expenseCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
         </div>
@@ -436,13 +477,15 @@ export default function PersonalBudget({
                     <span className="budget-cat-dot" style={{ background: EXPENSE_CAT_COLORS[cat] || '#64748b' }} />
                     {cat}
                     <span className="budget-cat-subtotal">
-                      {fmtR(budgetExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0))}
+                      {fmtR(budgetExpenses.filter(e => e.category === cat && e.paid).reduce((s, e) => s + e.amount, 0))}
+                      {' '}<span style={{ opacity: 0.55 }}>/ {fmtR(budgetExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0))}</span>
                     </span>
                   </div>
                   {budgetExpenses.filter(e => e.category === cat).map(item => (
                     <ExpenseRow key={item.id} item={item}
                       onDelete={() => onDeleteExpense(item.id)}
-                      onUpdate={(n, a, c, r) => onUpdateExpense(item.id, n, a, c, r)} />
+                      onUpdate={(n, a, c, r) => onUpdateExpense(item.id, n, a, c, r)}
+                      onTogglePaid={() => onToggleExpensePaid(item.id)} />
                   ))}
                 </div>
               ))}

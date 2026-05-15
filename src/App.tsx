@@ -406,11 +406,12 @@ function UpcomingStrip({ eventsForDate, onAddEvent, onDeleteEvent, onEditEvent }
 // ══════════════════════════════════════════════════════════════════
 // COSTS PANEL
 // ══════════════════════════════════════════════════════════════════
-function CostsPanel({ costs, onAdd, onDelete, onUpdate }: {
+function CostsPanel({ costs, onAdd, onDelete, onUpdate, onTogglePaid }: {
   costs: CostItem[];
   onAdd: (n: string, a: number, c: string) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, n: string, a: number, c: string) => void;
+  onTogglePaid: (id: string) => void;
 }) {
   const [adding, setAdding]     = useState(false);
   const [newName, setNewName]   = useState('');
@@ -422,7 +423,9 @@ function CostsPanel({ costs, onAdd, onDelete, onUpdate }: {
   const [editCat, setEditCat]   = useState(COST_CATEGORIES[0]);
   const [collapsed, setCollapsed] = useState(false);
 
-  const total = costs.reduce((s, c) => s + c.amount, 0);
+  const total     = costs.reduce((s, c) => s + c.amount, 0);
+  const totalPaid = costs.filter(c => c.paid).reduce((s, c) => s + c.amount, 0);
+  const unpaidCount = costs.filter(c => !c.paid).length;
 
   const submitAdd = () => {
     if (newName.trim()) { onAdd(newName.trim(), Number(newAmt) || 0, newCat); setNewName(''); setNewAmt(''); setAdding(false); }
@@ -440,7 +443,8 @@ function CostsPanel({ costs, onAdd, onDelete, onUpdate }: {
       <div className="section-head">
         <Receipt size={16} className="section-icon" />
         <span>Monthly Costs &amp; Subscriptions</span>
-        <span className="section-total">{fmtR(total)}</span>
+        {unpaidCount > 0 && <span className="unforeseen-badge">{unpaidCount} unpaid</span>}
+        <span className="section-total">{fmtR(totalPaid)} <span className="section-total-of">/ {fmtR(total)}</span></span>
         <button className="icon-btn" style={{ marginLeft: 4 }} onClick={() => setAdding(p => !p)}><Plus size={16} /></button>
         <button className="icon-btn" onClick={() => setCollapsed(p => !p)}>{collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
       </div>
@@ -481,9 +485,17 @@ function CostsPanel({ costs, onAdd, onDelete, onUpdate }: {
                       <button className="icon-btn" onClick={() => setEditId(null)}><X size={15} /></button>
                     </div>
                   ) : (
-                    <div key={item.id} className="cost-row">
+                    <div key={item.id} className={`cost-row ${item.paid ? 'cost-paid' : ''}`}>
+                      <button
+                        className={`paid-toggle-btn ${item.paid ? 'paid' : ''}`}
+                        onClick={() => onTogglePaid(item.id)}
+                        title={item.paid ? 'Mark as unpaid' : 'Mark as paid'}
+                      >
+                        {item.paid ? <Check size={11} strokeWidth={3} /> : null}
+                      </button>
                       <span className="cost-name">{item.name}</span>
-                      <span className="cost-amount">{fmtR(item.amount)}</span>
+                      {item.paid && <span className="badge-paid">Paid</span>}
+                      <span className={`cost-amount ${item.paid ? 'paid-amount' : ''}`}>{fmtR(item.amount)}</span>
                       <button className="icon-btn xs" onClick={() => startEdit(item)}><Edit3 size={13} /></button>
                       <button className="icon-btn xs red-h" onClick={() => onDelete(item.id)}><Trash2 size={13} /></button>
                     </div>
@@ -795,9 +807,10 @@ function AddTaskForm({ clientColor, assistants, onAdd }: {
 // ══════════════════════════════════════════════════════════════════
 // FINANCIALS PANEL
 // ══════════════════════════════════════════════════════════════════
-function FinancialsPanel({ client, onUpdate }: {
+function FinancialsPanel({ client, onUpdate, onToggleAdSpendPaid }: {
   client: Client;
   onUpdate: (f: 'monthlyIncome' | 'adSpend' | 'monthlyCost', v: number) => void;
+  onToggleAdSpendPaid: () => void;
 }) {
   const profit = client.monthlyIncome - client.adSpend - client.monthlyCost;
   return (
@@ -809,6 +822,18 @@ function FinancialsPanel({ client, onUpdate }: {
             <input type="number" className="fin-num" value={client[field] || ''}
               onChange={e => onUpdate(field, Number(e.target.value))} placeholder="0" />
           </div>
+          {field === 'adSpend' && client.adSpend > 0 && (
+            <button
+              className={`paid-toggle-btn ${client.adSpendPaid ? 'paid' : ''}`}
+              onClick={onToggleAdSpendPaid}
+              title={client.adSpendPaid ? 'Ad spend paid ✓ — click to undo' : 'Mark ad spend as paid'}
+            >
+              {client.adSpendPaid ? <Check size={11} strokeWidth={3} /> : null}
+            </button>
+          )}
+          {field === 'adSpend' && client.adSpend > 0 && client.adSpendPaid && (
+            <span className="badge-paid">Paid</span>
+          )}
         </div>
       ))}
       <div className={`fin-profit ${profit >= 0 ? 'pos' : 'neg'}`}>
@@ -823,13 +848,13 @@ function FinancialsPanel({ client, onUpdate }: {
 // CLIENT CARD
 // ══════════════════════════════════════════════════════════════════
 function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, onUpdateColor, onUpdateIcon,
-  onUpdateFinancials, onTogglePaid, onAddTask, onToggleTask, onDeleteTask, onEditTask
+  onUpdateFinancials, onTogglePaid, onToggleAdSpendPaid, onAddTask, onToggleTask, onDeleteTask, onEditTask
 }: {
   client: Client; users: AppUser[]; assistants: AppUser[];
   onDeleteClient: () => void; onUpdateName: (n: string) => void;
   onUpdateColor: (c: string) => void; onUpdateIcon: (i: string) => void;
   onUpdateFinancials: (f: 'monthlyIncome' | 'adSpend' | 'monthlyCost', v: number) => void;
-  onTogglePaid: () => void;
+  onTogglePaid: () => void; onToggleAdSpendPaid: () => void;
   onAddTask: (t: string, d: string, uid?: string) => void; onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void; onEditTask: (id: string, t: string, d: string) => void;
 }) {
@@ -880,7 +905,7 @@ function ClientCard({ client, users, assistants, onDeleteClient, onUpdateName, o
 
         {!collapsed && (
           <div className="client-body">
-            {showFin && <FinancialsPanel client={client} onUpdate={onUpdateFinancials} />}
+            {showFin && <FinancialsPanel client={client} onUpdate={onUpdateFinancials} onToggleAdSpendPaid={onToggleAdSpendPaid} />}
             <div className="task-list">
               {pending.length === 0 && done.length === 0 && <p className="empty-msg">No tasks yet — add one below</p>}
               {pending.map(t => (
@@ -963,7 +988,7 @@ function SummaryBar({
         <div className={`balance-card total ${businessBalance >= 0 ? 'pos' : 'neg'}`}>
           <span className="balance-lbl">Available Balance</span>
           <span className="balance-val-display">{fmtR(businessBalance)}</span>
-          <span className="balance-formula">Bank + Received − Costs</span>
+          <span className="balance-formula">Bank + Received − Paid Costs</span>
         </div>
         <button className="btn-reset-month" onClick={onResetMonth} title="Clear all paid flags for a new month">
           <RefreshCw size={13} /> New Month
@@ -1056,15 +1081,15 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     clients, addClient, deleteClient,
     updateClientName, updateClientColor, updateClientIcon, updateClientFinancials,
     addTask, toggleTask, deleteTask, editTask, assignTask, updateTaskStatus,
-    costs, addCost, deleteCost, updateCost,
+    costs, addCost, deleteCost, updateCost, toggleCostPaid,
     devProjects, addDevProject, deleteDevProject, updateDevProject,
     completeDevProject, reopenDevProject, updateDevProjectColor, updateDevProjectIcon,
     addDevTask, toggleDevTask, deleteDevTask, editDevTask,
     addSubTask, toggleSubTask, deleteSubTask,
     addEvent, deleteEvent, editEvent, eventsForDate,
     budgetIncome, budgetExpenses, unforeseenExpenses,
-    addBudgetIncome, deleteBudgetIncome, updateBudgetIncome,
-    addBudgetExpense, deleteBudgetExpense, updateBudgetExpense,
+    addBudgetIncome, deleteBudgetIncome, updateBudgetIncome, toggleBudgetIncomePaid,
+    addBudgetExpense, deleteBudgetExpense, updateBudgetExpense, toggleBudgetExpensePaid,
     addUnforeseen, deleteUnforeseen, updateUnforeseen, toggleUnforeseenPaid,
     onceOffCosts, monthlySnapshots, meetingNotes,
     addOnceOffCost, deleteOnceOffCost, updateOnceOffCost, toggleOnceOffPaid,
@@ -1074,9 +1099,10 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     currentBalance, setCurrentBalance,
     totalMonthlyIncome, totalReceivedIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid,
     totalPendingIncome, totalProfit, businessBalance, overdueCount,
-    totalBudgetIncome, totalBudgetExpenses, totalUnforeseen, budgetBalance,
+    totalBudgetIncome, totalPaidBudgetIncome, totalBudgetExpenses, totalPaidBudgetExpenses,
+    totalUnforeseen, budgetBalance,
     allTimeBusinessIncome, allTimeBusinessProfit, allTimePersonalBalance,
-    toggleClientPaid, resetMonthlyPayments,
+    toggleClientPaid, toggleClientAdSpendPaid, resetMonthlyPayments,
   } = useStore();
 
   const [newClientName, setNewClientName] = useState('');
@@ -1116,7 +1142,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
           <img src="/logo-bg.png" alt="Digital Solutions SA" className="header-logo" />
         </div>
         <div className="header-title-block">
-          <span className="header-eyebrow">Project Manager</span>
+          <span className="header-eyebrow">Hi, {auth.currentUser?.displayName || auth.currentUser?.username} 👋</span>
           <h1 className="header-title">Digital Solutions SA</h1>
         </div>
         <div className="header-right">
@@ -1151,7 +1177,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
       />
 
       {/* Costs */}
-      <CostsPanel costs={costs} onAdd={addCost} onDelete={deleteCost} onUpdate={updateCost} />
+      <CostsPanel costs={costs} onAdd={addCost} onDelete={deleteCost} onUpdate={updateCost} onTogglePaid={toggleCostPaid} />
 
       <OnceOffCosts
         items={onceOffCosts}
@@ -1204,6 +1230,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
                 onUpdateIcon={i => updateClientIcon(c.id, i)}
                 onUpdateFinancials={(f, v) => updateClientFinancials(c.id, f, v)}
                 onTogglePaid={() => toggleClientPaid(c.id)}
+                onToggleAdSpendPaid={() => toggleClientAdSpendPaid(c.id)}
                 onAddTask={(t, d, uid) => addTask(c.id, t, d, uid)}
                 onToggleTask={tid => toggleTask(c.id, tid)}
                 onDeleteTask={tid => deleteTask(c.id, tid)}
@@ -1351,15 +1378,19 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
           onAddIncome={addBudgetIncome}
           onDeleteIncome={deleteBudgetIncome}
           onUpdateIncome={updateBudgetIncome}
+          onToggleIncomePaid={toggleBudgetIncomePaid}
           onAddExpense={addBudgetExpense}
           onDeleteExpense={deleteBudgetExpense}
           onUpdateExpense={updateBudgetExpense}
+          onToggleExpensePaid={toggleBudgetExpensePaid}
           onAddUnforeseen={addUnforeseen}
           onDeleteUnforeseen={deleteUnforeseen}
           onUpdateUnforeseen={updateUnforeseen}
           onToggleUnforeseenPaid={toggleUnforeseenPaid}
           totalBudgetIncome={totalBudgetIncome}
+          totalPaidBudgetIncome={totalPaidBudgetIncome}
           totalBudgetExpenses={totalBudgetExpenses}
+          totalPaidBudgetExpenses={totalPaidBudgetExpenses}
           totalUnforeseen={totalUnforeseen}
           budgetBalance={budgetBalance}
         />

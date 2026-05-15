@@ -32,6 +32,7 @@ export interface Client {
   adSpend: number;
   monthlyCost: number;
   paidThisMonth?: boolean;  // must be ticked before income counts toward balance
+  adSpendPaid?: boolean;    // ad spend only deducted from balance when marked paid
 }
 
 // ── Business Monthly Costs ────────────────────────────────────────
@@ -40,6 +41,7 @@ export interface CostItem {
   name: string;
   amount: number;
   category: string;
+  paid?: boolean;
 }
 
 // ── Once-Off Costs ────────────────────────────────────────────────
@@ -110,6 +112,7 @@ export interface BudgetIncomeItem {
   amount: number;
   category: BudgetIncomeCategory;
   recurring: boolean;
+  paid?: boolean;
 }
 
 export interface BudgetExpenseItem {
@@ -118,6 +121,7 @@ export interface BudgetExpenseItem {
   amount: number;
   category: BudgetExpenseCategory;
   recurring: boolean;
+  paid?: boolean;
 }
 
 export interface UnforeseenExpense {
