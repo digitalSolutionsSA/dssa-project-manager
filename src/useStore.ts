@@ -32,12 +32,30 @@ export const PRESET_COLORS = [
 ];
 
 export const PRESET_ICONS = [
-  '💼','📊','📈','📋','🏢','🤝','💡','🎯',
-  '💻','📱','🌐','⚙️','🛠️','🔌','📡','🖥️',
-  '🎨','✏️','📸','🎬','🎵','🎭','🖌️','✨',
-  '💰','💎','🏦','💳','📉','🪙','💵','🏆',
-  '👥','🤵','👑','🦁','🚀','⭐','🌟','🔮',
-  '🔥','⚡','🌊','🌿','🏔️','🎪','🎸','🛡️',
+  // Business & Work
+  '💼','📊','📈','📋','🏢','🤝','💡','🎯','📌','🗂️','📁','📂','🖇️','📎','🗃️','🗄️',
+  // Tech & Digital
+  '💻','📱','🌐','⚙️','🛠️','🔌','📡','🖥️','🖨️','⌨️','🖱️','💾','💿','📀','🔧','🔩',
+  // Creative & Design
+  '🎨','✏️','📸','🎬','🎵','🎭','🖌️','✨','🖼️','🎞️','🎙️','🎚️','🎛️','📽️','🎤','🎧',
+  // Finance & Money
+  '💰','💎','🏦','💳','📉','🪙','💵','🏆','💹','🤑','💸','🏧','💲','🪙','📈','💴',
+  // People & Social
+  '👥','🤵','👑','🦁','🚀','⭐','🌟','🔮','👤','👨‍💼','👩‍💼','🤝','🫱','🫲','👋','🙌',
+  // Nature & Elements
+  '🔥','⚡','🌊','🌿','🏔️','🌱','🌳','🌻','🌈','☀️','🌙','❄️','🌪️','🌊','🍃','🌾',
+  // Food & Lifestyle
+  '☕','🍕','🍔','🥗','🍷','🎂','🍎','🥑','🧃','🥤','🍜','🍣','🥩','🧁','🍺','🎉',
+  // Transport & Places
+  '🚗','✈️','🚀','🏠','🏪','🏨','🏋️','⛽','🚢','🚁','🛸','🚂','🏗️','🏰','🌆','🗺️',
+  // Sports & Health
+  '⚽','🏀','🎾','🏊','🧘','💪','🏃','🧗','🎯','🥊','🏄','🎿','🏇','🚴','🤸','🏌️',
+  // Symbols & Misc
+  '🛡️','⚔️','🔑','🗝️','🔐','💌','📣','📢','🚦','✅','❌','💯','🆕','🔔','🎁','🎖️',
+  // Animals
+  '🦁','🐯','🦊','🐺','🦋','🦅','🐉','🦄','🐸','🦁','🐧','🦜','🐬','🦈','🦒','🦓',
+  // More fun
+  '👾','🤖','👻','💀','🎃','🌈','🔭','🧬','⚗️','🧲','💊','🔬','🏅','🎗️','🧩','🎲',
 ];
 
 export const EVENT_COLORS = [
@@ -129,7 +147,8 @@ export function useStore() {
   const [onceOffCosts,setOnceOffCosts]           = useState<OnceOffCost[]>(()=>load(K.onceOff,[]));
   const [monthlySnapshots,setSnapshots]          = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
-  const [currentBalance,setCurrentBalance]        = useState<number>(()=>load(K.balance,0));
+  // Balance stored as a single-element array to reuse the same Firebase sync infrastructure
+  const [currentBalance,setCurrentBalance]        = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
   const [fbReady,setFbReady]                     = useState(false);
   const [fbError,setFbError]                     = useState<string|null>(null);
   const isFirebaseConfigured = !!getFirebaseDb();
@@ -161,13 +180,8 @@ export function useStore() {
   useEffect(()=>{persistAndSync(K.onceOff,'onceOffCosts',onceOffCosts);},[onceOffCosts,fbReady]);
   useEffect(()=>{persistAndSync(K.snapshots,'monthlySnapshots',monthlySnapshots);},[monthlySnapshots,fbReady]);
   useEffect(()=>{persistAndSync(K.notes,'meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
-  // Balance is a plain number — wrap in array so persistAndSync works unchanged
-  useEffect(()=>{
-    save(K.balance, currentBalance);
-    if (!fbReady) return;
-    if (remoteUpdateKeys.current.has('currentBalance')) { remoteUpdateKeys.current.delete('currentBalance'); return; }
-    fbPush('currentBalance', currentBalance);
-  },[currentBalance,fbReady]);
+  // Balance wrapped in array so it flows through the same persistAndSync infrastructure
+  useEffect(()=>{persistAndSync(K.balance,'currentBalance',[currentBalance]);},[currentBalance,fbReady]);
 
   // ── Firebase realtime listener ────────────────────────────────
   useEffect(()=>{
@@ -184,6 +198,8 @@ export function useStore() {
       onceOffCosts:(v)=>setOnceOffCosts(v as OnceOffCost[]),
       monthlySnapshots:(v)=>setSnapshots(v as MonthlySnapshot[]),
       meetingNotes:(v)=>setMeetingNotes(v as MeetingNote[]),
+      // Balance stored as [number] — unwrap on receive
+      currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
     const unsubs = Object.entries(setters).map(([key,setter])=>{
       return onSnapshot(doc(db,'appData',key),(snap)=>{
@@ -202,17 +218,7 @@ export function useStore() {
         setFbReady(true);
       });
     });
-    // Balance listener (plain number, not array)
-    const balanceUnsub = onSnapshot(doc(db,'appData','currentBalance'),(snap)=>{
-      if(snap.exists()){
-        const d=snap.data();
-        if(d && typeof d.value==='number'){
-          remoteUpdateKeys.current.add('currentBalance');
-          setCurrentBalance(d.value);
-        }
-      }
-    });
-    return ()=>{ unsubs.forEach(u=>u()); balanceUnsub(); };
+    return ()=>unsubs.forEach(u=>u());
   },[]);
 
   // ── CLIENTS ──────────────────────────────────────────────────────

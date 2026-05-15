@@ -85,6 +85,19 @@ function CustomiseModal({ color, icon, onClose, onColor, onIcon }: {
                 onClick={() => onColor(c)} />
             ))}
           </div>
+          <div className="custom-color-row">
+            <label className="custom-color-label" htmlFor="custom-color-picker">
+              <span className="custom-color-preview" style={{ background: color }} />
+              Custom colour
+            </label>
+            <input
+              id="custom-color-picker"
+              type="color"
+              value={color.startsWith('#') ? color : '#6c63ff'}
+              onChange={e => onColor(e.target.value)}
+              className="custom-color-input"
+            />
+          </div>
           <p className="field-label" style={{ marginTop: '16px' }}>Icon</p>
           <div className="icon-grid">
             {PRESET_ICONS.map(i => (
@@ -1353,7 +1366,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
       )}
 
       <footer className="app-footer">
-        <img src="/logo.png" alt="Digital Solutions SA" className="footer-logo" />
+        <img src="/logo-bg.png" alt="Digital Solutions SA" className="footer-logo" />
         <span className="footer-text">Digital Solutions SA · {new Date().toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}</span>
         <span className="footer-text">All data saved locally</span>
       </footer>
