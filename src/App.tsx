@@ -4,7 +4,7 @@ import {
   DollarSign, ChevronDown, ChevronUp, Zap, Clock,
   Calendar, Palette, Code2, Receipt, ChevronRight,
   CircleCheck, RefreshCw, ChevronLeft, Wallet, Wifi, WifiOff, BookOpen, History,
-  LogOut, Users,
+  LogOut, Users, Tag,
 } from 'lucide-react';
 import { useStore, PRESET_COLORS, PRESET_ICONS, EVENT_COLORS, COST_CATEGORIES, todayStr } from './useStore';
 import { useAuth } from './useAuth';
@@ -16,6 +16,7 @@ import MeetingNotes from './MeetingNotes';
 import LoginScreen from './LoginScreen';
 import AssistantView from './AssistantView';
 import UserManagement from './UserManagement';
+import PriceList from './PriceList';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function addDays(base: Date, n: number) { const d = new Date(base); d.setDate(d.getDate() + n); return d; }
@@ -1065,13 +1066,17 @@ export default function App() {
 
 // Wrapper so AssistantView can get store data
 function AssistantViewWrapper({ auth }: { auth: ReturnType<typeof useAuth> }) {
-  const { clients, updateTaskStatus } = useStore();
+  const { clients, updateTaskStatus, eventsForDate, priceList } = useStore();
+  const assistants = auth.users.filter(u => u.role === 'assistant');
   return (
     <AssistantView
       currentUser={auth.currentUser!}
       clients={clients}
       onUpdateStatus={updateTaskStatus}
       onLogout={auth.logout}
+      eventsForDate={eventsForDate}
+      priceList={priceList}
+      allAssistants={assistants}
     />
   );
 }
@@ -1095,6 +1100,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     addOnceOffCost, deleteOnceOffCost, updateOnceOffCost, toggleOnceOffPaid,
     saveMonthSnapshot, deleteSnapshot, updateSnapshotNotes,
     addMeetingNote, deleteMeetingNote, updateMeetingNote,
+    priceList, addPriceItem, deletePriceItem, updatePriceItem,
     isFirebaseConfigured, fbReady, fbError,
     currentBalance, setCurrentBalance,
     totalMonthlyIncome, totalReceivedIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid,
@@ -1110,7 +1116,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const [showAddDev, setShowAddDev]       = useState(false);
   const [newDevClient, setNewDevClient]   = useState('');
   const [newDevProject, setNewDevProject] = useState('');
-  const [activeTab, setActiveTab]         = useState<'retainer' | 'dev' | 'calendar' | 'budget' | 'history' | 'notes' | 'users'>('retainer');
+  const [activeTab, setActiveTab]         = useState<'retainer' | 'dev' | 'calendar' | 'budget' | 'history' | 'notes' | 'users' | 'prices'>('retainer');
   const assistants = auth.users.filter(u => u.role === 'assistant');
   const clientInputRef = useRef<HTMLInputElement>(null);
 
@@ -1209,6 +1215,10 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
         </button>
         <button className={`tab-btn ${activeTab === 'notes' ? 'active' : ''}`} onClick={() => setActiveTab('notes')}>
           <BookOpen size={15} /><span className="tab-label"> Notes</span>
+        </button>
+        <button className={`tab-btn ${activeTab === 'prices' ? 'active' : ''}`} onClick={() => setActiveTab('prices')}>
+          <Tag size={15} /><span className="tab-label"> Prices</span>
+          {priceList.length > 0 && <span className="tab-count">{priceList.length}</span>}
         </button>
         <button className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
           <Users size={15} /><span className="tab-label"> Users</span>
@@ -1358,6 +1368,20 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
         />
       )}
 
+      {/* PRICES TAB */}
+      {activeTab === 'prices' && (
+        <main className="dev-section">
+          <PriceList
+            items={priceList}
+            assistants={assistants}
+            mode="admin"
+            onAdd={data => addPriceItem(data.productCode, data.name, data.category, data.price, data.description, data.visibleTo)}
+            onUpdate={(id, data) => updatePriceItem(id, data.productCode, data.name, data.category, data.price, data.description, data.visibleTo)}
+            onDelete={deletePriceItem}
+          />
+        </main>
+      )}
+
       {/* USERS TAB */}
       {activeTab === 'users' && (
         <UserManagement
@@ -1366,6 +1390,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
           onAddUser={auth.addUser}
           onDeleteUser={auth.deleteUser}
           onChangePin={auth.changePin}
+          onUpdatePermissions={auth.updateUserPermissions}
         />
       )}
 

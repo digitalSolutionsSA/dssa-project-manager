@@ -4,6 +4,7 @@ import {
   BudgetIncomeItem, BudgetExpenseItem, UnforeseenExpense,
   BudgetIncomeCategory, BudgetExpenseCategory,
   OnceOffCost, MonthlySnapshot, MeetingNote,
+  PriceListItem, PriceCategory,
 } from './types';
 import { getFirebaseDb } from './firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -21,6 +22,7 @@ const K = {
   snapshots:    'sb_snapshots',
   notes:        'sb_meetingNotes',
   balance:      'sb_currentBalance',
+  priceList:    'sb_priceList',
 };
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ export function useStore() {
   const [onceOffCosts,setOnceOffCosts]           = useState<OnceOffCost[]>(()=>load(K.onceOff,[]));
   const [monthlySnapshots,setSnapshots]          = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
+  const [priceList,setPriceList]                 = useState<PriceListItem[]>(()=>load(K.priceList,[]));
   // Balance stored as a single-element array to reuse the same Firebase sync infrastructure
   const [currentBalance,setCurrentBalance]        = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
   const [fbReady,setFbReady]                     = useState(false);
@@ -180,6 +183,7 @@ export function useStore() {
   useEffect(()=>{persistAndSync(K.onceOff,'onceOffCosts',onceOffCosts);},[onceOffCosts,fbReady]);
   useEffect(()=>{persistAndSync(K.snapshots,'monthlySnapshots',monthlySnapshots);},[monthlySnapshots,fbReady]);
   useEffect(()=>{persistAndSync(K.notes,'meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
+  useEffect(()=>{persistAndSync(K.priceList,'priceList',priceList);},[priceList,fbReady]);
   // Balance wrapped in array so it flows through the same persistAndSync infrastructure
   useEffect(()=>{persistAndSync(K.balance,'currentBalance',[currentBalance]);},[currentBalance,fbReady]);
 
@@ -198,6 +202,7 @@ export function useStore() {
       onceOffCosts:(v)=>setOnceOffCosts(v as OnceOffCost[]),
       monthlySnapshots:(v)=>setSnapshots(v as MonthlySnapshot[]),
       meetingNotes:(v)=>setMeetingNotes(v as MeetingNote[]),
+      priceList:(v)=>setPriceList(v as PriceListItem[]),
       // Balance stored as [number] — unwrap on receive
       currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
@@ -360,6 +365,13 @@ export function useStore() {
     setMeetingNotes(p=>p.map(n=>n.id===id?{...n,date,customerName,title,notes,followUp,updatedAt:new Date().toISOString()}:n)
       .sort((a,b)=>b.date.localeCompare(a.date)));
 
+  // ── PRICE LIST ────────────────────────────────────────────────────
+  const addPriceItem=(productCode:string,name:string,category:PriceCategory,price:number,description:string,visibleTo:'all'|string[])=>
+    setPriceList(p=>[...p,{id:genId(),productCode,name,category,price,description,visibleTo,createdAt:new Date().toISOString()}]);
+  const deletePriceItem=(id:string)=>setPriceList(p=>p.filter(i=>i.id!==id));
+  const updatePriceItem=(id:string,productCode:string,name:string,category:PriceCategory,price:number,description:string,visibleTo:'all'|string[])=>
+    setPriceList(p=>p.map(i=>i.id===id?{...i,productCode,name,category,price,description,visibleTo}:i));
+
   // ── COMPUTED ──────────────────────────────────────────────────────
   const totalMonthlyIncome  = clients.reduce((s,c)=>s+c.monthlyIncome,0);
   const totalReceivedIncome = clients.filter(c=>c.paidThisMonth).reduce((s,c)=>s+c.monthlyIncome,0);
@@ -420,6 +432,7 @@ export function useStore() {
     addUnforeseen,deleteUnforeseen,updateUnforeseen,toggleUnforeseenPaid,
     saveMonthSnapshot,deleteSnapshot,updateSnapshotNotes,
     addMeetingNote,deleteMeetingNote,updateMeetingNote,
+    priceList,addPriceItem,deletePriceItem,updatePriceItem,
     totalMonthlyIncome,totalReceivedIncome,
     totalAdSpend,totalPaidAdSpend,
     totalMonthlyCosts,totalPaidMonthlyCosts,

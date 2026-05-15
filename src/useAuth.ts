@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getFirebaseDb } from './firebase';
 import { AppUser, UserRole } from './types';
+type UserPermissions = Pick<AppUser, 'calendarAccess'>;
 
 // ── Helpers ───────────────────────────────────────────────────────
 function genId(): string { return Math.random().toString(36).substring(2, 10); }
@@ -156,8 +157,19 @@ export function useAuth() {
     await fbPushUsers(updated);
   }
 
+  // ── Update user permissions / flags ───────────────────────────
+  async function updateUserPermissions(id: string, perms: Partial<UserPermissions>): Promise<void> {
+    const updated = users.map(u => u.id === id ? { ...u, ...perms } : u);
+    setUsers(updated);
+    // If this user is currently logged in, update the session too
+    if (id === currentUser?.id) {
+      setCurrentUser(prev => prev ? { ...prev, ...perms } : prev);
+    }
+    await fbPushUsers(updated);
+  }
+
   return {
     currentUser, users, isLoading, authError,
-    login, logout, addUser, deleteUser, changePin,
+    login, logout, addUser, deleteUser, changePin, updateUserPermissions,
   };
 }

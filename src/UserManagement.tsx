@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, KeyRound, Users, Check, X, ShieldCheck, UserCog } from 'lucide-react';
+import { Plus, Trash2, KeyRound, Users, Check, X, ShieldCheck, UserCog, Calendar, Tag } from 'lucide-react';
 import { AppUser, UserRole } from './types';
 
 interface Props {
@@ -8,9 +8,10 @@ interface Props {
   onAddUser: (username: string, pin: string, role: UserRole, displayName: string) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
   onChangePin: (id: string, newPin: string) => Promise<void>;
+  onUpdatePermissions: (id: string, perms: { calendarAccess?: boolean }) => Promise<void>;
 }
 
-export default function UserManagement({ users, currentUserId, onAddUser, onDeleteUser, onChangePin }: Props) {
+export default function UserManagement({ users, currentUserId, onAddUser, onDeleteUser, onChangePin, onUpdatePermissions }: Props) {
   const [showAdd, setShowAdd]       = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -121,6 +122,20 @@ export default function UserManagement({ users, currentUserId, onAddUser, onDele
             <span className={`user-role-badge ${u.role}`}>
               {u.role === 'admin' ? 'Admin' : 'Assistant'}
             </span>
+
+            {/* Permission toggles (assistants only) */}
+            {u.role === 'assistant' && (
+              <div className="user-perms">
+                <button
+                  className={`perm-toggle-btn ${u.calendarAccess ? 'on' : ''}`}
+                  onClick={() => onUpdatePermissions(u.id, { calendarAccess: !u.calendarAccess })}
+                  title={u.calendarAccess ? 'Revoke calendar access' : 'Grant calendar access'}
+                >
+                  <Calendar size={12} />
+                  <span>Calendar</span>
+                </button>
+              </div>
+            )}
 
             {/* Change PIN inline */}
             {changingPinFor === u.id ? (

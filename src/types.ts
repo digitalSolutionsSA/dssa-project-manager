@@ -9,6 +9,7 @@ export interface AppUser {
   role: UserRole;
   displayName: string;
   createdAt: string;
+  calendarAccess?: boolean;  // assistant can view calendar
 }
 
 // ── Retainer Clients ─────────────────────────────────────────────
@@ -149,6 +150,22 @@ export interface MonthlySnapshot {
   personalUnforeseen: number;
   personalBalance: number;
   notes: string;
+}
+
+// ── Price List ────────────────────────────────────────────────────
+export type PriceCategory =
+  | 'Web Development' | 'App Development'
+  | 'Social Media Marketing' | 'Misc';
+
+export interface PriceListItem {
+  id: string;
+  productCode: string;
+  name: string;
+  category: PriceCategory;
+  price: number;
+  description: string;
+  visibleTo: 'all' | string[];  // 'all' = every assistant; string[] = specific user IDs
+  createdAt: string;
 }
 
 // ── Meeting Notes ─────────────────────────────────────────────────
