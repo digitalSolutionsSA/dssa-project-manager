@@ -4,7 +4,7 @@ import {
   DollarSign, ChevronDown, ChevronUp, Zap, Clock,
   Calendar, Palette, Code2, Receipt, ChevronRight,
   CircleCheck, RefreshCw, ChevronLeft, Wallet, Wifi, WifiOff, BookOpen, History,
-  LogOut, Users, Tag,
+  LogOut, Users, Tag, ClipboardList,
 } from 'lucide-react';
 import { useStore, PRESET_COLORS, PRESET_ICONS, EVENT_COLORS, COST_CATEGORIES, todayStr } from './useStore';
 import { useAuth } from './useAuth';
@@ -17,6 +17,8 @@ import LoginScreen from './LoginScreen';
 import AssistantView from './AssistantView';
 import UserManagement from './UserManagement';
 import PriceList from './PriceList';
+import OddTasks from './OddTasks';
+import WorkloadDashboard from './WorkloadDashboard';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function addDays(base: Date, n: number) { const d = new Date(base); d.setDate(d.getDate() + n); return d; }
@@ -1071,13 +1073,15 @@ export default function App() {
 
 // Wrapper so AssistantView can get store data
 function AssistantViewWrapper({ auth }: { auth: ReturnType<typeof useAuth> }) {
-  const { clients, updateTaskStatus, eventsForDate, priceList } = useStore();
+  const { clients, updateTaskStatus, eventsForDate, priceList, oddTasks, updateOddTaskStatus } = useStore();
   const assistants = auth.users.filter(u => u.role === 'assistant');
   return (
     <AssistantView
       currentUser={auth.currentUser!}
       clients={clients}
+      oddTasks={oddTasks}
       onUpdateStatus={updateTaskStatus}
+      onUpdateOddTaskStatus={updateOddTaskStatus}
       onLogout={auth.logout}
       eventsForDate={eventsForDate}
       priceList={priceList}
@@ -1106,6 +1110,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     saveMonthSnapshot, deleteSnapshot, updateSnapshotNotes,
     addMeetingNote, deleteMeetingNote, updateMeetingNote,
     priceList, addPriceItem, deletePriceItem, updatePriceItem,
+    oddTasks, addOddTask, deleteOddTask, updateOddTask, updateOddTaskStatus, assignOddTask,
     isFirebaseConfigured, fbReady, fbError,
     currentBalance, setCurrentBalance,
     totalMonthlyIncome, totalReceivedIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid,
@@ -1121,7 +1126,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const [showAddDev, setShowAddDev]       = useState(false);
   const [newDevClient, setNewDevClient]   = useState('');
   const [newDevProject, setNewDevProject] = useState('');
-  const [activeTab, setActiveTab]         = useState<'retainer' | 'dev' | 'calendar' | 'budget' | 'history' | 'notes' | 'users' | 'prices'>('retainer');
+  const [activeTab, setActiveTab]         = useState<'retainer' | 'dev' | 'calendar' | 'budget' | 'history' | 'notes' | 'users' | 'prices' | 'tasks'>('retainer');
   const assistants = auth.users.filter(u => u.role === 'assistant');
   const clientInputRef = useRef<HTMLInputElement>(null);
 
@@ -1224,6 +1229,12 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
         <button className={`tab-btn ${activeTab === 'prices' ? 'active' : ''}`} onClick={() => setActiveTab('prices')}>
           <Tag size={15} /><span className="tab-label"> Prices</span>
           {priceList.length > 0 && <span className="tab-count">{priceList.length}</span>}
+        </button>
+        <button className={`tab-btn ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => setActiveTab('tasks')}>
+          <ClipboardList size={15} /><span className="tab-label"> Tasks</span>
+          {oddTasks.filter(t => t.status !== 'completed').length > 0 && (
+            <span className="tab-count">{oddTasks.filter(t => t.status !== 'completed').length}</span>
+          )}
         </button>
         <button className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
           <Users size={15} /><span className="tab-label"> Users</span>
@@ -1383,6 +1394,26 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
             onAdd={data => addPriceItem(data.productCode, data.name, data.category, data.price, data.description, data.visibleTo)}
             onUpdate={(id, data) => updatePriceItem(id, data.productCode, data.name, data.category, data.price, data.description, data.visibleTo)}
             onDelete={deletePriceItem}
+          />
+        </main>
+      )}
+
+      {/* TASKS TAB */}
+      {activeTab === 'tasks' && (
+        <main className="dev-section">
+          <WorkloadDashboard
+            clients={clients}
+            oddTasks={oddTasks}
+            users={auth.users}
+          />
+          <OddTasks
+            tasks={oddTasks}
+            users={auth.users}
+            onAdd={(title, dueDate, notes, assignedTo, priority) => addOddTask(title, dueDate, notes, assignedTo, priority)}
+            onDelete={deleteOddTask}
+            onUpdate={(id, title, dueDate, notes, priority) => updateOddTask(id, title, dueDate, notes, priority)}
+            onStatusChange={(id, status) => updateOddTaskStatus(id, status)}
+            onAssign={(id, uid) => assignOddTask(id, uid)}
           />
         </main>
       )}

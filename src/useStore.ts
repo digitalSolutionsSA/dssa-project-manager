@@ -5,6 +5,7 @@ import {
   BudgetIncomeCategory, BudgetExpenseCategory,
   OnceOffCost, MonthlySnapshot, MeetingNote,
   PriceListItem, PriceCategory,
+  OddTask, OddTaskPriority,
 } from './types';
 import { getFirebaseDb } from './firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -23,6 +24,7 @@ const K = {
   notes:        'sb_meetingNotes',
   balance:      'sb_currentBalance',
   priceList:    'sb_priceList',
+  oddTasks:     'sb_oddTasks',
 };
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -150,6 +152,7 @@ export function useStore() {
   const [monthlySnapshots,setSnapshots]          = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
   const [priceList,setPriceList]                 = useState<PriceListItem[]>(()=>load(K.priceList,[]));
+  const [oddTasks,setOddTasks]                   = useState<OddTask[]>(()=>load(K.oddTasks,[]));
   // Balance stored as a single-element array to reuse the same Firebase sync infrastructure
   const [currentBalance,setCurrentBalance]        = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
   const [fbReady,setFbReady]                     = useState(false);
@@ -184,6 +187,7 @@ export function useStore() {
   useEffect(()=>{persistAndSync(K.snapshots,'monthlySnapshots',monthlySnapshots);},[monthlySnapshots,fbReady]);
   useEffect(()=>{persistAndSync(K.notes,'meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
   useEffect(()=>{persistAndSync(K.priceList,'priceList',priceList);},[priceList,fbReady]);
+  useEffect(()=>{persistAndSync(K.oddTasks,'oddTasks',oddTasks);},[oddTasks,fbReady]);
   // Balance wrapped in array so it flows through the same persistAndSync infrastructure
   useEffect(()=>{persistAndSync(K.balance,'currentBalance',[currentBalance]);},[currentBalance,fbReady]);
 
@@ -203,6 +207,7 @@ export function useStore() {
       monthlySnapshots:(v)=>setSnapshots(v as MonthlySnapshot[]),
       meetingNotes:(v)=>setMeetingNotes(v as MeetingNote[]),
       priceList:(v)=>setPriceList(v as PriceListItem[]),
+      oddTasks:(v)=>setOddTasks(v as OddTask[]),
       // Balance stored as [number] — unwrap on receive
       currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
@@ -372,6 +377,17 @@ export function useStore() {
   const updatePriceItem=(id:string,productCode:string,name:string,category:PriceCategory,price:number,description:string,visibleTo:'all'|string[])=>
     setPriceList(p=>p.map(i=>i.id===id?{...i,productCode,name,category,price,description,visibleTo}:i));
 
+  // ── ODD TASKS ─────────────────────────────────────────────────────
+  const addOddTask=(title:string,dueDate:string,notes:string,assignedTo?:string,priority:OddTaskPriority='medium')=>
+    setOddTasks(p=>[...p,{id:genId(),title,dueDate,notes,status:'not-started' as TaskStatus,assignedTo,priority,createdAt:new Date().toISOString()}]);
+  const deleteOddTask=(id:string)=>setOddTasks(p=>p.filter(t=>t.id!==id));
+  const updateOddTask=(id:string,title:string,dueDate:string,notes:string,priority:OddTaskPriority)=>
+    setOddTasks(p=>p.map(t=>t.id===id?{...t,title,dueDate,notes,priority}:t));
+  const updateOddTaskStatus=(id:string,status:TaskStatus)=>
+    setOddTasks(p=>p.map(t=>t.id===id?{...t,status}:t));
+  const assignOddTask=(id:string,userId:string|undefined)=>
+    setOddTasks(p=>p.map(t=>t.id===id?{...t,assignedTo:userId}:t));
+
   // ── COMPUTED ──────────────────────────────────────────────────────
   const totalMonthlyIncome  = clients.reduce((s,c)=>s+c.monthlyIncome,0);
   const totalReceivedIncome = clients.filter(c=>c.paidThisMonth).reduce((s,c)=>s+c.monthlyIncome,0);
@@ -402,14 +418,17 @@ export function useStore() {
   const budgetBalance          = totalPaidBudgetIncome - totalPaidBudgetExpenses - totalUnforeseen;
 
   // Cumulative totals across all snapshots
-  const allTimeBusinessIncome  = monthlySnapshots.reduce((s,sn)=>s+sn.businessIncome+sn.devIncome,0);
-  const allTimeBusinessProfit  = monthlySnapshots.reduce((s,sn)=>s+sn.businessProfit,0);
-  const allTimePersonalBalance = monthlySnapshots.reduce((s,sn)=>s+sn.personalBalance,0);
+  // businessIncome = retainer only, devIncome stored separately — sum both for true income total
+  const allTimeBusinessIncome  = monthlySnapshots.reduce((s,sn)=>s+(sn.businessIncome||0)+(sn.devIncome||0),0);
+  // businessProfit snapshot only covers retainer profit; add devIncome for true net profit
+  const allTimeBusinessProfit  = monthlySnapshots.reduce((s,sn)=>s+(sn.businessProfit||0)+(sn.devIncome||0),0);
+  // Personal balance: sum of each month's surplus/deficit
+  const allTimePersonalBalance = monthlySnapshots.reduce((s,sn)=>s+(sn.personalBalance||0),0);
 
-  const overdueCount = clients.reduce((n,c)=>{
-    const t=todayStr();
-    return n+c.tasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t).length;
-  },0);
+  const t0=todayStr();
+  const overdueCount = clients.reduce((n,c)=>
+    n+c.tasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t0).length,0)
+    + oddTasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t0).length;
 
   return {
     clients,events,costs,devProjects,
@@ -433,6 +452,7 @@ export function useStore() {
     saveMonthSnapshot,deleteSnapshot,updateSnapshotNotes,
     addMeetingNote,deleteMeetingNote,updateMeetingNote,
     priceList,addPriceItem,deletePriceItem,updatePriceItem,
+    oddTasks,addOddTask,deleteOddTask,updateOddTask,updateOddTaskStatus,assignOddTask,
     totalMonthlyIncome,totalReceivedIncome,
     totalAdSpend,totalPaidAdSpend,
     totalMonthlyCosts,totalPaidMonthlyCosts,

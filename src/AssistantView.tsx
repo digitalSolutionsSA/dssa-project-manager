@@ -4,14 +4,16 @@ import {
   AlertTriangle, Calendar, Tag,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { AppUser, Client, TaskStatus, CalendarEvent, PriceListItem } from './types';
+import { AppUser, Client, TaskStatus, CalendarEvent, PriceListItem, OddTask } from './types';
 import { todayStr } from './useStore';
 import PriceList from './PriceList';
 
 interface Props {
   currentUser: AppUser;
   clients: Client[];
+  oddTasks: OddTask[];
   onUpdateStatus: (cid: string, tid: string, status: TaskStatus) => void;
+  onUpdateOddTaskStatus: (id: string, status: TaskStatus) => void;
   onLogout: () => void;
   eventsForDate: (date: string) => CalendarEvent[];
   priceList: PriceListItem[];
@@ -136,11 +138,10 @@ function AssistantCalendar({ eventsForDate }: { eventsForDate: (d: string) => Ca
 type Tab = 'tasks' | 'calendar' | 'prices';
 
 export default function AssistantView({
-  currentUser, clients, onUpdateStatus, onLogout,
+  currentUser, clients, oddTasks, onUpdateStatus, onUpdateOddTaskStatus, onLogout,
   eventsForDate, priceList, allAssistants,
 }: Props) {
   const hasCalendar = !!currentUser.calendarAccess;
-  // Show prices tab if there's at least one item visible to this user
   const myPrices = priceList.filter(i =>
     i.visibleTo === 'all' || (i.visibleTo as string[]).includes(currentUser.id)
   );
@@ -150,12 +151,26 @@ export default function AssistantView({
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [filter, setFilter]       = useState<Filter>('all');
 
-  // ── Tasks ──────────────────────────────────────────────────────
-  const allTasks = clients.flatMap(client =>
+  // ── Client tasks assigned to me ────────────────────────────────
+  const clientTaskItems = clients.flatMap(client =>
     client.tasks
       .filter(t => t.assignedTo === currentUser.id)
-      .map(t => ({ task: t, clientName: client.name, clientColor: client.color, clientId: client.id }))
-  ).sort((a, b) => {
+      .map(t => ({ task: t, clientName: client.name, clientColor: client.color, clientId: client.id, isOdd: false as const, oddId: '' }))
+  );
+
+  // ── Odd tasks assigned to me ───────────────────────────────────
+  const oddTaskItems = (oddTasks || [])
+    .filter(t => t.assignedTo === currentUser.id)
+    .map(t => ({
+      task: { id: t.id, title: t.title, dueDate: t.dueDate, status: t.status, assignedTo: t.assignedTo, createdAt: t.createdAt },
+      clientName: '📋 Standalone',
+      clientColor: '#6366f1',
+      clientId: '',
+      isOdd: true as const,
+      oddId: t.id,
+    }));
+
+  const allTasks = [...clientTaskItems, ...oddTaskItems].sort((a, b) => {
     const order: Record<TaskStatus, number> = { 'not-started': 0, 'in-progress': 1, 'completed': 2 };
     const s = order[a.task.status] - order[b.task.status];
     return s !== 0 ? s : a.task.dueDate.localeCompare(b.task.dueDate);
@@ -246,7 +261,7 @@ export default function AssistantView({
             </div>
           ) : (
             <div className="assistant-task-list">
-              {visible.map(({ task, clientName, clientColor, clientId }) => {
+              {visible.map(({ task, clientName, clientColor, clientId, isOdd, oddId }) => {
                 const today  = todayStr();
                 const isOver = task.status !== 'completed' && task.dueDate < today;
                 const isTdy  = task.status !== 'completed' && task.dueDate === today;
@@ -268,7 +283,7 @@ export default function AssistantView({
                     <div className="assistant-status-row">
                       {(Object.keys(STATUS_CONFIG) as TaskStatus[]).map(s => (
                         <button key={s} className={`status-btn ${s} ${task.status === s ? 'active' : ''}`}
-                          onClick={() => onUpdateStatus(clientId, task.id, s)}>
+                          onClick={() => isOdd ? onUpdateOddTaskStatus(oddId, s) : onUpdateStatus(clientId, task.id, s)}>
                           {STATUS_CONFIG[s].icon}{STATUS_CONFIG[s].label}
                         </button>
                       ))}

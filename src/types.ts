@@ -168,6 +168,20 @@ export interface PriceListItem {
   createdAt: string;
 }
 
+// ── Odd / Standalone Tasks ────────────────────────────────────────
+export type OddTaskPriority = 'low' | 'medium' | 'high';
+
+export interface OddTask {
+  id: string;
+  title: string;
+  notes: string;
+  dueDate: string;           // YYYY-MM-DD
+  status: TaskStatus;
+  assignedTo?: string;       // AppUser.id — undefined = admin's own task
+  priority: OddTaskPriority;
+  createdAt: string;
+}
+
 // ── Meeting Notes ─────────────────────────────────────────────────
 export interface MeetingNote {
   id: string;
