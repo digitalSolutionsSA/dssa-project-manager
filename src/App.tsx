@@ -1111,7 +1111,7 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     addMeetingNote, deleteMeetingNote, updateMeetingNote,
     priceList, addPriceItem, deletePriceItem, updatePriceItem,
     oddTasks, addOddTask, deleteOddTask, updateOddTask, updateOddTaskStatus, assignOddTask,
-    isFirebaseConfigured, fbReady, fbError,
+    isFirebaseConfigured, fbReady, fbError, forceSyncToFirebase,
     currentBalance, setCurrentBalance,
     totalMonthlyIncome, totalReceivedIncome, totalAdSpend, totalCosts, totalOnceOffUnpaid,
     totalPendingIncome, totalProfit, businessBalance, overdueCount,
@@ -1120,6 +1120,15 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
     allTimeBusinessIncome, allTimeBusinessProfit, allTimePersonalBalance,
     toggleClientPaid, toggleClientAdSpendPaid, resetMonthlyPayments,
   } = useStore();
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
+  const handleForceSync = async () => {
+    setSyncing(true); setSyncDone(false);
+    await forceSyncToFirebase();
+    setSyncing(false); setSyncDone(true);
+    setTimeout(() => setSyncDone(false), 3000);
+  };
 
   const [newClientName, setNewClientName] = useState('');
   const [showAddClient, setShowAddClient] = useState(false);
@@ -1171,6 +1180,19 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
               {!isFirebaseConfigured ? 'Local' : fbError ? 'Sync Error' : fbReady ? 'Synced' : 'Syncing…'}
             </span>
           </div>
+          {isFirebaseConfigured && fbReady && (
+            <button
+              className={`btn-force-sync ${syncDone ? 'done' : ''}`}
+              onClick={handleForceSync}
+              disabled={syncing}
+              title="Force upload all local data to the cloud"
+            >
+              <RefreshCw size={13} className={syncing ? 'spin' : ''} />
+              <span className="btn-force-sync-label">
+                {syncing ? 'Uploading…' : syncDone ? 'Uploaded!' : 'Upload to Cloud'}
+              </span>
+            </button>
+          )}
           <button className="btn-logout" onClick={auth.logout}>
             <LogOut size={14} />
             <span className="btn-logout-label">Sign Out</span>

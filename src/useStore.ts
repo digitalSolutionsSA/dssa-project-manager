@@ -471,6 +471,27 @@ export function useStore() {
     n+c.tasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t0).length,0)
     + oddTasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t0).length;
 
+  // Explicitly push all local state to Firebase — use when data is stuck locally
+  // and hasn't made it to the cloud (e.g. after a race condition wiped Firestore).
+  async function forceSyncToFirebase() {
+    if (!fbReady) return;
+    await Promise.all([
+      fbPush('clients',              clients),
+      fbPush('events',               events),
+      fbPush('costs',                costs),
+      fbPush('devProjects',          devProjects),
+      fbPush('budgetIncome',         budgetIncome),
+      fbPush('budgetExpenses',       budgetExpenses),
+      fbPush('unforeseenExpenses',   unforeseenExpenses),
+      fbPush('onceOffCosts',         onceOffCosts),
+      fbPush('monthlySnapshots',     monthlySnapshots),
+      fbPush('meetingNotes',         meetingNotes),
+      fbPush('priceList',            priceList),
+      fbPush('oddTasks',             oddTasks),
+      fbPush('currentBalance',       [currentBalance]),
+    ]);
+  }
+
   return {
     clients,events,costs,devProjects,
     budgetIncome,budgetExpenses,unforeseenExpenses,
@@ -504,6 +525,6 @@ export function useStore() {
     totalBudgetExpenses,totalPaidBudgetExpenses,
     totalUnforeseen,budgetBalance,
     allTimeBusinessIncome,allTimeBusinessProfit,allTimePersonalBalance,
-    overdueCount,
+    overdueCount, forceSyncToFirebase,
   };
 }
