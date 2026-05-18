@@ -225,12 +225,39 @@ export function useStore() {
       }
     };
 
+    // Map from Firestore doc key → localStorage key, used by the empty-overwrite guard
+    const lsKeys: Record<string, string> = {
+      clients: K.clients, events: K.events, costs: K.costs,
+      devProjects: K.devProjects, budgetIncome: K.budgetInc,
+      budgetExpenses: K.budgetExp, unforeseenExpenses: K.unforeseen,
+      onceOffCosts: K.onceOff, monthlySnapshots: K.snapshots,
+      meetingNotes: K.notes, priceList: K.priceList,
+      oddTasks: K.oddTasks, currentBalance: K.balance,
+    };
+
     const unsubs = Object.entries(setters).map(([key,setter])=>{
       let firstSnap = true;
       return onSnapshot(doc(db,'appData',key),(snap)=>{
         if(snap.exists()){
           const d=snap.data();
           if(d&&Array.isArray(d.value)){
+            // Guard: if Firebase returned an empty array but localStorage has real data,
+            // skip the overwrite — the persistence effect will push local data back to Firebase.
+            if(d.value.length === 0){
+              const lsKey = lsKeys[key];
+              if(lsKey){
+                try {
+                  const local = localStorage.getItem(lsKey);
+                  if(local){
+                    const parsed = JSON.parse(local);
+                    if(Array.isArray(parsed) && parsed.length > 0){
+                      if (firstSnap) { firstSnap = false; markOneReady(); }
+                      return;
+                    }
+                  }
+                } catch { /* ignore parse errors */ }
+              }
+            }
             remoteUpdateKeys.current.add(key);
             setter(d.value);
           }

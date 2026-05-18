@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow all reads and writes to the appData collection.
+    // This app uses a custom PIN-based auth system stored in Firestore itself,
+    // so Firebase Auth is not used. These rules keep the data accessible
+    // from all devices without expiry.
+    match /appData/{document} {
+      allow read, write: if true;
+    }
+  }
+}
