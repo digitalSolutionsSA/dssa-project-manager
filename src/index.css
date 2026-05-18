@@ -1833,37 +1833,49 @@ input, select, textarea {
 }
 .wd-no-tasks { font-size: 0.82rem; color: var(--text3); padding: 20px 0; }
 
-/* Ring SVG */
-.ring-chart-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.ring-chart-label { font-size: 0.8rem; color: var(--text3); }
-
-.ring-legend {
-  display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
-  font-size: 0.72rem; color: var(--text3);
+/* Ring card inner: SVG left, stats right */
+.wd-ring-inner {
+  display: flex; align-items: flex-start; gap: 14px; width: 100%;
 }
-.ring-leg-item { display: flex; align-items: center; gap: 4px; }
-.ring-leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.wd-svg-wrap { flex-shrink: 0; }
 
-/* Stat pills */
-.ring-stat-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-.ring-stat-pill {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 4px 10px; border-radius: var(--r);
-  border: 1px solid var(--border2); background: var(--surface2);
-  min-width: 42px;
+/* Side stats column */
+.wd-ring-stats {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1; min-width: 0;
 }
-.ring-stat-pill.total      { border-color: rgba(99,102,241,0.3); }
-.ring-stat-pill.completed  { border-color: rgba(16,185,129,0.3); }
-.ring-stat-pill.in-progress{ border-color: rgba(99,102,241,0.3); }
-.ring-stat-pill.overdue    { border-color: rgba(239,68,68,0.3); }
-.rsp-val { font-size: 0.95rem; font-weight: 700; color: var(--text); }
-.rsp-lbl { font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+.wd-ring-total {
+  display: flex; align-items: baseline; gap: 5px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.wdr-total-num { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+.wdr-total-lbl { font-size: 0.72rem; color: var(--text3); }
+
+/* Each stat row: dot · label · bar · % · count */
+.wd-ring-stat-row {
+  display: grid;
+  grid-template-columns: 8px 62px 1fr 34px 32px;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+}
+.wd-ring-stat-row.overdue-row { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.wdr-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.wdr-label { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wdr-bar-wrap { min-width: 0; }
+.wdr-bar { height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+.wdr-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+.wdr-pct { font-weight: 700; text-align: right; font-size: 0.8rem; }
+.wdr-count { color: var(--text3); text-align: right; }
 
 /* Client breakdown */
 .wd-client-breakdown { display: flex; flex-direction: column; gap: 8px; }
 .wd-client-grid { display: flex; flex-direction: column; gap: 6px; }
 .wd-client-row {
-  display: flex; align-items: center; gap: 10px;
+  display: grid;
+  grid-template-columns: 30px 1fr 1fr auto;
+  align-items: center; gap: 10px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r); padding: 8px 14px;
 }
@@ -1872,22 +1884,26 @@ input, select, textarea {
   display: flex; align-items: center; justify-content: center;
   font-size: 0.9rem; flex-shrink: 0;
 }
-.wd-client-name { font-size: 0.875rem; font-weight: 600; color: var(--text); flex: 1; min-width: 80px; }
-.wd-mini-bar-wrap { display: flex; align-items: center; gap: 6px; flex: 2; }
-.wd-mini-bar {
-  flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden;
-}
+.wd-client-name { font-size: 0.875rem; font-weight: 600; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wd-client-bars { display: flex; flex-direction: column; gap: 4px; }
+.wd-client-bar-row { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; }
+.wd-client-bar-lbl { color: var(--text3); min-width: 30px; }
+.wd-mini-bar { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
 .wd-mini-bar-done { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
-.wd-mini-pct { font-size: 0.78rem; color: var(--text3); font-weight: 600; min-width: 30px; text-align: right; }
-.wd-client-counts { font-size: 0.8rem; color: var(--text3); min-width: 40px; text-align: right; }
+.wd-mini-pct { font-size: 0.75rem; color: var(--text2); font-weight: 600; min-width: 28px; text-align: right; }
+.wd-client-counts { font-size: 0.8rem; color: var(--text3); text-align: right; white-space: nowrap; }
 .wd-overdue-flag { color: var(--red); font-weight: 700; }
 
-@media (max-width: 768px) {
-  .wd-rings-row { gap: 14px; }
-  .wd-ring-card { min-width: 140px; padding: 14px 12px 12px; }
+@media (max-width: 900px) {
+  .wd-rings-row { flex-wrap: wrap; }
+  .wd-ring-card { min-width: calc(50% - 10px); }
 }
-@media (max-width: 560px) {
+@media (max-width: 600px) {
+  .wd-ring-inner { flex-direction: column; align-items: center; }
+  .wd-ring-stats { width: 100%; }
   .wd-rings-row { flex-direction: column; }
-  .wd-ring-card { width: 100%; }
+  .wd-ring-card { width: 100%; min-width: unset; }
+  .wd-client-row { grid-template-columns: 28px 1fr auto; }
+  .wd-client-bars { display: none; }
 }
 

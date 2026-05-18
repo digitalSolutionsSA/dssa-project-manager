@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getFirebaseDb } from './firebase';
 import { AppUser, UserRole } from './types';
-type UserPermissions = Pick<AppUser, 'calendarAccess'>;
+type UserPermissions = Pick<AppUser, 'calendarAccess' | 'tasksAccess' | 'pricesAccess'>;
 
 // ── Helpers ───────────────────────────────────────────────────────
 function genId(): string { return Math.random().toString(36).substring(2, 10); }

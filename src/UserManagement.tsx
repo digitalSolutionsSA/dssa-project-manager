@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, KeyRound, Users, Check, X, ShieldCheck, UserCog, Calendar, Tag } from 'lucide-react';
+import { Plus, Trash2, KeyRound, Users, Check, X, ShieldCheck, UserCog, Calendar, Tag, ClipboardList } from 'lucide-react';
 import { AppUser, UserRole } from './types';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   onAddUser: (username: string, pin: string, role: UserRole, displayName: string) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
   onChangePin: (id: string, newPin: string) => Promise<void>;
-  onUpdatePermissions: (id: string, perms: { calendarAccess?: boolean }) => Promise<void>;
+  onUpdatePermissions: (id: string, perms: { calendarAccess?: boolean; tasksAccess?: boolean; pricesAccess?: boolean }) => Promise<void>;
 }
 
 export default function UserManagement({ users, currentUserId, onAddUser, onDeleteUser, onChangePin, onUpdatePermissions }: Props) {
@@ -127,12 +127,28 @@ export default function UserManagement({ users, currentUserId, onAddUser, onDele
             {u.role === 'assistant' && (
               <div className="user-perms">
                 <button
+                  className={`perm-toggle-btn ${u.tasksAccess !== false ? 'on' : ''}`}
+                  onClick={() => onUpdatePermissions(u.id, { tasksAccess: u.tasksAccess === false ? true : false })}
+                  title={u.tasksAccess !== false ? 'Revoke tasks access' : 'Grant tasks access'}
+                >
+                  <ClipboardList size={12} />
+                  <span>Tasks</span>
+                </button>
+                <button
                   className={`perm-toggle-btn ${u.calendarAccess ? 'on' : ''}`}
                   onClick={() => onUpdatePermissions(u.id, { calendarAccess: !u.calendarAccess })}
                   title={u.calendarAccess ? 'Revoke calendar access' : 'Grant calendar access'}
                 >
                   <Calendar size={12} />
                   <span>Calendar</span>
+                </button>
+                <button
+                  className={`perm-toggle-btn ${u.pricesAccess ? 'on' : ''}`}
+                  onClick={() => onUpdatePermissions(u.id, { pricesAccess: !u.pricesAccess })}
+                  title={u.pricesAccess ? 'Revoke price list access' : 'Grant price list access'}
+                >
+                  <Tag size={12} />
+                  <span>Prices</span>
                 </button>
               </div>
             )}

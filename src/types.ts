@@ -9,7 +9,9 @@ export interface AppUser {
   role: UserRole;
   displayName: string;
   createdAt: string;
-  calendarAccess?: boolean;  // assistant can view calendar
+  calendarAccess?: boolean;  // assistant can view calendar tab
+  tasksAccess?: boolean;     // assistant can view tasks tab (default: true)
+  pricesAccess?: boolean;    // assistant can view price list tab (default: false)
 }
 
 // ── Retainer Clients ─────────────────────────────────────────────

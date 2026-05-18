@@ -141,13 +141,16 @@ export default function AssistantView({
   currentUser, clients, oddTasks, onUpdateStatus, onUpdateOddTaskStatus, onLogout,
   eventsForDate, priceList, allAssistants,
 }: Props) {
+  // tasksAccess defaults to true if not explicitly set to false
+  const hasTasks    = currentUser.tasksAccess !== false;
   const hasCalendar = !!currentUser.calendarAccess;
-  const myPrices = priceList.filter(i =>
-    i.visibleTo === 'all' || (i.visibleTo as string[]).includes(currentUser.id)
-  );
-  const hasPrices = myPrices.length > 0;
+  // pricesAccess is an explicit opt-in; if granted, filter to items visible to this user
+  const hasPrices   = !!currentUser.pricesAccess;
+  const myPrices = hasPrices
+    ? priceList.filter(i => i.visibleTo === 'all' || (i.visibleTo as string[]).includes(currentUser.id))
+    : [];
 
-  const defaultTab: Tab = 'tasks';
+  const defaultTab: Tab = hasTasks ? 'tasks' : hasCalendar ? 'calendar' : 'prices';
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [filter, setFilter]       = useState<Filter>('all');
 
@@ -210,10 +213,12 @@ export default function AssistantView({
 
       {/* Tab nav */}
       <div className="tab-nav" role="tablist">
-        <button className={`tab-btn ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => setActiveTab('tasks')}>
-          <ClipboardList size={15} /><span className="tab-label"> My Tasks</span>
-          {counts.all > 0 && <span className="tab-count">{counts['not-started'] + counts['in-progress']}</span>}
-        </button>
+        {hasTasks && (
+          <button className={`tab-btn ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => setActiveTab('tasks')}>
+            <ClipboardList size={15} /><span className="tab-label"> My Tasks</span>
+            {counts.all > 0 && <span className="tab-count">{counts['not-started'] + counts['in-progress']}</span>}
+          </button>
+        )}
         {hasCalendar && (
           <button className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>
             <Calendar size={15} /><span className="tab-label"> Schedule</span>
@@ -222,13 +227,13 @@ export default function AssistantView({
         {hasPrices && (
           <button className={`tab-btn ${activeTab === 'prices' ? 'active' : ''}`} onClick={() => setActiveTab('prices')}>
             <Tag size={15} /><span className="tab-label"> Price List</span>
-            <span className="tab-count">{myPrices.length}</span>
+            {myPrices.length > 0 && <span className="tab-count">{myPrices.length}</span>}
           </button>
         )}
       </div>
 
       {/* ── TASKS TAB ─────────────────────────────────────────────── */}
-      {activeTab === 'tasks' && (
+      {activeTab === 'tasks' && hasTasks && (
         <main className="assistant-board">
           {/* Filter tabs */}
           <div className="assistant-filter-tabs">

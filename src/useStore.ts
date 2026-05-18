@@ -211,7 +211,22 @@ export function useStore() {
       // Balance stored as [number] — unwrap on receive
       currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
+    // Only mark fbReady after ALL listeners have fired their first snapshot.
+    // If any single listener fires early (e.g. a new/missing doc), it would
+    // otherwise set fbReady=true and trigger writes of stale local data back
+    // to Firebase before the other collections have been received.
+    const totalListeners = Object.keys(setters).length;
+    let readyCount = 0;
+    const markOneReady = () => {
+      readyCount++;
+      if (readyCount >= totalListeners) {
+        setFbReady(true);
+        setFbError(null);
+      }
+    };
+
     const unsubs = Object.entries(setters).map(([key,setter])=>{
+      let firstSnap = true;
       return onSnapshot(doc(db,'appData',key),(snap)=>{
         if(snap.exists()){
           const d=snap.data();
@@ -220,12 +235,11 @@ export function useStore() {
             setter(d.value);
           }
         }
-        setFbReady(true);
-        setFbError(null);
+        if (firstSnap) { firstSnap = false; markOneReady(); }
       },(err)=>{
         console.warn('FB listen error:',err.message);
         setFbError(err.message);
-        setFbReady(true);
+        if (firstSnap) { firstSnap = false; markOneReady(); }
       });
     });
     return ()=>unsubs.forEach(u=>u());
