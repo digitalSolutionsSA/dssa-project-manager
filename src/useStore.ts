@@ -7,8 +7,7 @@ import {
   PriceListItem, PriceCategory,
   OddTask, OddTaskPriority,
 } from './types';
-import { getFirebaseDb } from './firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabaseClient } from './supabase';
 
 // ── Storage keys ──────────────────────────────────────────────────
 const K = {
@@ -105,13 +104,13 @@ function save(key: string, val: unknown) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
-// ── Firebase push helper ──────────────────────────────────────────
-async function fbPush(key: string, val: unknown) {
-  const db = getFirebaseDb();
-  if (!db) return;
+// ── Supabase push helper ──────────────────────────────────────────
+async function sbPush(key: string, val: unknown) {
+  const sb = getSupabaseClient();
   try {
-    await setDoc(doc(db,'appData',key),{ value: val, updatedAt: new Date().toISOString() });
-  } catch(e){ console.warn('Firebase push failed:',e); }
+    const { error } = await sb.from('app_data').upsert({ key, value: val, updated_at: new Date().toISOString() });
+    if (error) console.warn('Supabase push failed:', error.message);
+  } catch(e) { console.warn('Supabase push failed:', e); }
 }
 
 // ── Task migration (completed:boolean → status:TaskStatus) ────────
@@ -157,22 +156,19 @@ export function useStore() {
   const [currentBalance,setCurrentBalance]        = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
   const [fbReady,setFbReady]                     = useState(false);
   const [fbError,setFbError]                     = useState<string|null>(null);
-  const isFirebaseConfigured = !!getFirebaseDb();
+  const isFirebaseConfigured = true;
   // Track which collection keys are being updated from Firebase so we don't
   // push stale localStorage data back after receiving a remote snapshot.
   const remoteUpdateKeys = useRef(new Set<string>());
 
-  const persistAndSync = (localKey: string, firebaseKey: string, value: unknown) => {
+  const persistAndSync = (localKey: string, sbKey: string, value: unknown) => {
     save(localKey, value);
-
     if (!fbReady) return;
-
-    if (remoteUpdateKeys.current.has(firebaseKey)) {
-      remoteUpdateKeys.current.delete(firebaseKey);
+    if (remoteUpdateKeys.current.has(sbKey)) {
+      remoteUpdateKeys.current.delete(sbKey);
       return;
     }
-
-    fbPush(firebaseKey, value);
+    sbPush(sbKey, value);
   };
 
   // ── LocalStorage persist ──────────────────────────────────────
@@ -191,10 +187,9 @@ export function useStore() {
   // Balance wrapped in array so it flows through the same persistAndSync infrastructure
   useEffect(()=>{persistAndSync(K.balance,'currentBalance',[currentBalance]);},[currentBalance,fbReady]);
 
-  // ── Firebase realtime listener ────────────────────────────────
+  // ── Supabase realtime listener ────────────────────────────────
   useEffect(()=>{
-    const db=getFirebaseDb();
-    if(!db)return;
+    const sb = getSupabaseClient();
     const setters:{[k:string]:(v:unknown)=>void}={
       clients:(v)=>setClients(migrateClients(v as Client[])),
       events:(v)=>setEvents(v as CalendarEvent[]),
@@ -208,68 +203,40 @@ export function useStore() {
       meetingNotes:(v)=>setMeetingNotes(v as MeetingNote[]),
       priceList:(v)=>setPriceList(v as PriceListItem[]),
       oddTasks:(v)=>setOddTasks(v as OddTask[]),
-      // Balance stored as [number] — unwrap on receive
       currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
-    // Only mark fbReady after ALL listeners have fired their first snapshot.
-    // If any single listener fires early (e.g. a new/missing doc), it would
-    // otherwise set fbReady=true and trigger writes of stale local data back
-    // to Firebase before the other collections have been received.
-    const totalListeners = Object.keys(setters).length;
-    let readyCount = 0;
-    const markOneReady = () => {
-      readyCount++;
-      if (readyCount >= totalListeners) {
-        setFbReady(true);
-        setFbError(null);
+
+    // Handle an incoming row from realtime or initial fetch
+    function applyRow(key: string, value: unknown) {
+      const setter = setters[key];
+      if (setter && Array.isArray(value) && value.length > 0) {
+        remoteUpdateKeys.current.add(key);
+        setter(value);
       }
-    };
+    }
 
-    // Map from Firestore doc key → localStorage key, used by the empty-overwrite guard
-    const lsKeys: Record<string, string> = {
-      clients: K.clients, events: K.events, costs: K.costs,
-      devProjects: K.devProjects, budgetIncome: K.budgetInc,
-      budgetExpenses: K.budgetExp, unforeseenExpenses: K.unforeseen,
-      onceOffCosts: K.onceOff, monthlySnapshots: K.snapshots,
-      meetingNotes: K.notes, priceList: K.priceList,
-      oddTasks: K.oddTasks, currentBalance: K.balance,
-    };
+    // Subscribe first so we don't miss any changes that arrive during the fetch
+    const channel = sb
+      .channel('app-data')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_data' },
+        (p) => applyRow((p.new as {key:string}).key, (p.new as {value:unknown}).value))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_data' },
+        (p) => applyRow((p.new as {key:string}).key, (p.new as {value:unknown}).value))
+      .subscribe();
 
-    const unsubs = Object.entries(setters).map(([key,setter])=>{
-      let firstSnap = true;
-      return onSnapshot(doc(db,'appData',key),(snap)=>{
-        if(snap.exists()){
-          const d=snap.data();
-          if(d&&Array.isArray(d.value)){
-            // Guard: if Firebase returned an empty array but localStorage has real data,
-            // skip the overwrite — the persistence effect will push local data back to Firebase.
-            if(d.value.length === 0){
-              const lsKey = lsKeys[key];
-              if(lsKey){
-                try {
-                  const local = localStorage.getItem(lsKey);
-                  if(local){
-                    const parsed = JSON.parse(local);
-                    if(Array.isArray(parsed) && parsed.length > 0){
-                      if (firstSnap) { firstSnap = false; markOneReady(); }
-                      return;
-                    }
-                  }
-                } catch { /* ignore parse errors */ }
-              }
-            }
-            remoteUpdateKeys.current.add(key);
-            setter(d.value);
-          }
-        }
-        if (firstSnap) { firstSnap = false; markOneReady(); }
-      },(err)=>{
-        console.warn('FB listen error:',err.message);
-        setFbError(err.message);
-        if (firstSnap) { firstSnap = false; markOneReady(); }
-      });
+    // Fetch all current data in one round-trip, then mark ready
+    sb.from('app_data').select('key, value').then(({ data, error }) => {
+      if (error) {
+        console.warn('Supabase load error:', error.message);
+        setFbError(error.message);
+      } else if (data) {
+        for (const row of data) applyRow(row.key, row.value);
+      }
+      setFbReady(true);
+      setFbError(null);
     });
-    return ()=>unsubs.forEach(u=>u());
+
+    return () => { sb.removeChannel(channel); };
   },[]);
 
   // ── CLIENTS ──────────────────────────────────────────────────────
@@ -476,19 +443,19 @@ export function useStore() {
   async function forceSyncToFirebase() {
     if (!fbReady) return;
     await Promise.all([
-      fbPush('clients',              clients),
-      fbPush('events',               events),
-      fbPush('costs',                costs),
-      fbPush('devProjects',          devProjects),
-      fbPush('budgetIncome',         budgetIncome),
-      fbPush('budgetExpenses',       budgetExpenses),
-      fbPush('unforeseenExpenses',   unforeseenExpenses),
-      fbPush('onceOffCosts',         onceOffCosts),
-      fbPush('monthlySnapshots',     monthlySnapshots),
-      fbPush('meetingNotes',         meetingNotes),
-      fbPush('priceList',            priceList),
-      fbPush('oddTasks',             oddTasks),
-      fbPush('currentBalance',       [currentBalance]),
+      sbPush('clients',              clients),
+      sbPush('events',               events),
+      sbPush('costs',                costs),
+      sbPush('devProjects',          devProjects),
+      sbPush('budgetIncome',         budgetIncome),
+      sbPush('budgetExpenses',       budgetExpenses),
+      sbPush('unforeseenExpenses',   unforeseenExpenses),
+      sbPush('onceOffCosts',         onceOffCosts),
+      sbPush('monthlySnapshots',     monthlySnapshots),
+      sbPush('meetingNotes',         meetingNotes),
+      sbPush('priceList',            priceList),
+      sbPush('oddTasks',             oddTasks),
+      sbPush('currentBalance',       [currentBalance]),
     ]);
   }
 
