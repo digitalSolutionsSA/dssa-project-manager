@@ -492,6 +492,6 @@ export function useStore() {
     totalBudgetExpenses,totalPaidBudgetExpenses,
     totalUnforeseen,budgetBalance,
     allTimeBusinessIncome,allTimeBusinessProfit,allTimePersonalBalance,
-    overdueCount, forceSyncToFirebase,
+    overdueCount,
   };
 }
