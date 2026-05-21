@@ -6,6 +6,7 @@ import {
   OnceOffCost, MonthlySnapshot, MeetingNote,
   PriceListItem, PriceCategory,
   OddTask, OddTaskPriority,
+  IncomeSubscription,
 } from './types';
 import { getSupabaseClient } from './supabase';
 
@@ -24,6 +25,7 @@ const K = {
   balance:      'sb_currentBalance',
   priceList:    'sb_priceList',
   oddTasks:     'sb_oddTasks',
+  incSubs:      'sb_incomeSubscriptions',
 };
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -152,6 +154,7 @@ export function useStore() {
   const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
   const [priceList,setPriceList]                 = useState<PriceListItem[]>(()=>load(K.priceList,[]));
   const [oddTasks,setOddTasks]                   = useState<OddTask[]>(()=>load(K.oddTasks,[]));
+  const [incomeSubscriptions,setIncomeSubscriptions] = useState<IncomeSubscription[]>(()=>load(K.incSubs,[]));
   // Balance stored as a single-element array to reuse the same Firebase sync infrastructure
   const [currentBalance,setCurrentBalance]        = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
   const [fbReady,setFbReady]                     = useState(false);
@@ -184,6 +187,7 @@ export function useStore() {
   useEffect(()=>{persistAndSync(K.notes,'meetingNotes',meetingNotes);},[meetingNotes,fbReady]);
   useEffect(()=>{persistAndSync(K.priceList,'priceList',priceList);},[priceList,fbReady]);
   useEffect(()=>{persistAndSync(K.oddTasks,'oddTasks',oddTasks);},[oddTasks,fbReady]);
+  useEffect(()=>{persistAndSync(K.incSubs,'incomeSubscriptions',incomeSubscriptions);},[incomeSubscriptions,fbReady]);
   // Balance wrapped in array so it flows through the same persistAndSync infrastructure
   useEffect(()=>{persistAndSync(K.balance,'currentBalance',[currentBalance]);},[currentBalance,fbReady]);
 
@@ -203,6 +207,7 @@ export function useStore() {
       meetingNotes:(v)=>setMeetingNotes(v as MeetingNote[]),
       priceList:(v)=>setPriceList(v as PriceListItem[]),
       oddTasks:(v)=>setOddTasks(v as OddTask[]),
+      incomeSubscriptions:(v)=>setIncomeSubscriptions(v as IncomeSubscription[]),
       currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
 
@@ -396,6 +401,13 @@ export function useStore() {
   const assignOddTask=(id:string,userId:string|undefined)=>
     setOddTasks(p=>p.map(t=>t.id===id?{...t,assignedTo:userId}:t));
 
+  // ── INCOME SUBSCRIPTIONS ──────────────────────────────────────────
+  const addIncomeSubscription=(customerName:string,amount:number,invoiceDate:string)=>
+    setIncomeSubscriptions(p=>[...p,{id:genId(),customerName,amount,invoiceDate,createdAt:new Date().toISOString()}]);
+  const deleteIncomeSubscription=(id:string)=>setIncomeSubscriptions(p=>p.filter(s=>s.id!==id));
+  const updateIncomeSubscription=(id:string,customerName:string,amount:number,invoiceDate:string)=>
+    setIncomeSubscriptions(p=>p.map(s=>s.id===id?{...s,customerName,amount,invoiceDate}:s));
+
   // ── COMPUTED ──────────────────────────────────────────────────────
   const totalMonthlyIncome  = clients.reduce((s,c)=>s+c.monthlyIncome,0);
   const totalReceivedIncome = clients.filter(c=>c.paidThisMonth).reduce((s,c)=>s+c.monthlyIncome,0);
@@ -455,6 +467,7 @@ export function useStore() {
       sbPush('meetingNotes',         meetingNotes),
       sbPush('priceList',            priceList),
       sbPush('oddTasks',             oddTasks),
+      sbPush('incomeSubscriptions',  incomeSubscriptions),
       sbPush('currentBalance',       [currentBalance]),
     ]);
   }
@@ -482,6 +495,7 @@ export function useStore() {
     addMeetingNote,deleteMeetingNote,updateMeetingNote,
     priceList,addPriceItem,deletePriceItem,updatePriceItem,
     oddTasks,addOddTask,deleteOddTask,updateOddTask,updateOddTaskStatus,assignOddTask,
+    incomeSubscriptions,addIncomeSubscription,deleteIncomeSubscription,updateIncomeSubscription,
     totalMonthlyIncome,totalReceivedIncome,
     totalAdSpend,totalPaidAdSpend,
     totalMonthlyCosts,totalPaidMonthlyCosts,

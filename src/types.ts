@@ -195,3 +195,12 @@ export interface MeetingNote {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Income Subscriptions ──────────────────────────────────────────
+export interface IncomeSubscription {
+  id: string;
+  customerName: string;
+  amount: number;
+  invoiceDate: string; // YYYY-MM-DD
+  createdAt: string;
+}
