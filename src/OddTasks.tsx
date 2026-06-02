@@ -17,6 +17,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   'not-started': 'Not Started',
   'in-progress': 'In Progress',
   completed: 'Done',
+  delayed: 'Delayed',
 };
 
 function OddTaskRow({ task, users, onDelete, onEdit, onStatusChange, onAssign }: {

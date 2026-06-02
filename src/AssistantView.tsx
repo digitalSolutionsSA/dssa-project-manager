@@ -21,9 +21,10 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<TaskStatus, { label: string; icon: React.ReactNode; cls: string }> = {
-  'not-started': { label: 'Not Started', icon: <Circle size={13} />,     cls: 'not-started' },
-  'in-progress':  { label: 'In Progress', icon: <Loader2 size={13} />,   cls: 'in-progress' },
-  'completed':    { label: 'Completed',   icon: <CheckCircle2 size={13}/>,cls: 'completed'   },
+  'not-started': { label: 'Not Started', icon: <Circle size={13} />,       cls: 'not-started' },
+  'in-progress':  { label: 'In Progress', icon: <Loader2 size={13} />,     cls: 'in-progress' },
+  'completed':    { label: 'Completed',   icon: <CheckCircle2 size={13}/>, cls: 'completed'   },
+  'delayed':      { label: 'Delayed',     icon: <Circle size={13} />,      cls: 'not-started' },
 };
 
 type Filter = 'all' | TaskStatus;
@@ -174,7 +175,7 @@ export default function AssistantView({
     }));
 
   const allTasks = [...clientTaskItems, ...oddTaskItems].sort((a, b) => {
-    const order: Record<TaskStatus, number> = { 'not-started': 0, 'in-progress': 1, 'completed': 2 };
+    const order: Record<TaskStatus, number> = { 'not-started': 0, 'in-progress': 1, 'delayed': 2, 'completed': 3 };
     const s = order[a.task.status] - order[b.task.status];
     return s !== 0 ? s : a.task.dueDate.localeCompare(b.task.dueDate);
   });
@@ -185,6 +186,7 @@ export default function AssistantView({
     'not-started': allTasks.filter(x => x.task.status === 'not-started').length,
     'in-progress': allTasks.filter(x => x.task.status === 'in-progress').length,
     'completed':   allTasks.filter(x => x.task.status === 'completed').length,
+    'delayed':     allTasks.filter(x => x.task.status === 'delayed').length,
   };
 
   return (

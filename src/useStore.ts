@@ -7,25 +7,29 @@ import {
   PriceListItem, PriceCategory,
   OddTask, OddTaskPriority,
   IncomeSubscription,
+  Customer, UnexpectedIncome, Transaction,
 } from './types';
 import { getSupabaseClient } from './supabase';
 
 // ── Storage keys ──────────────────────────────────────────────────
 const K = {
-  clients:      'sb_clients',
-  events:       'sb_events',
-  costs:        'sb_costs',
-  devProjects:  'sb_devProjects',
-  budgetInc:    'sb_budgetIncome',
-  budgetExp:    'sb_budgetExpenses',
-  unforeseen:   'sb_unforeseen',
-  onceOff:      'sb_onceOffCosts',
-  snapshots:    'sb_snapshots',
-  notes:        'sb_meetingNotes',
-  balance:      'sb_currentBalance',
-  priceList:    'sb_priceList',
-  oddTasks:     'sb_oddTasks',
-  incSubs:      'sb_incomeSubscriptions',
+  clients:         'sb_clients',
+  events:          'sb_events',
+  costs:           'sb_costs',
+  devProjects:     'sb_devProjects',
+  budgetInc:       'sb_budgetIncome',
+  budgetExp:       'sb_budgetExpenses',
+  unforeseen:      'sb_unforeseen',
+  onceOff:         'sb_onceOffCosts',
+  snapshots:       'sb_snapshots',
+  notes:           'sb_meetingNotes',
+  balance:         'sb_currentBalance',
+  priceList:       'sb_priceList',
+  oddTasks:        'sb_oddTasks',
+  incSubs:         'sb_incomeSubscriptions',
+  customers:       'sb_customers',
+  unexpectedInc:   'sb_unexpectedIncome',
+  transactions:    'sb_transactions',
 };
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -37,29 +41,17 @@ export const PRESET_COLORS = [
 ];
 
 export const PRESET_ICONS = [
-  // Business & Work
   '💼','📊','📈','📋','🏢','🤝','💡','🎯','📌','🗂️','📁','📂','🖇️','📎','🗃️','🗄️',
-  // Tech & Digital
   '💻','📱','🌐','⚙️','🛠️','🔌','📡','🖥️','🖨️','⌨️','🖱️','💾','💿','📀','🔧','🔩',
-  // Creative & Design
   '🎨','✏️','📸','🎬','🎵','🎭','🖌️','✨','🖼️','🎞️','🎙️','🎚️','🎛️','📽️','🎤','🎧',
-  // Finance & Money
   '💰','💎','🏦','💳','📉','🪙','💵','🏆','💹','🤑','💸','🏧','💲','🪙','📈','💴',
-  // People & Social
   '👥','🤵','👑','🦁','🚀','⭐','🌟','🔮','👤','👨‍💼','👩‍💼','🤝','🫱','🫲','👋','🙌',
-  // Nature & Elements
   '🔥','⚡','🌊','🌿','🏔️','🌱','🌳','🌻','🌈','☀️','🌙','❄️','🌪️','🌊','🍃','🌾',
-  // Food & Lifestyle
   '☕','🍕','🍔','🥗','🍷','🎂','🍎','🥑','🧃','🥤','🍜','🍣','🥩','🧁','🍺','🎉',
-  // Transport & Places
   '🚗','✈️','🚀','🏠','🏪','🏨','🏋️','⛽','🚢','🚁','🛸','🚂','🏗️','🏰','🌆','🗺️',
-  // Sports & Health
   '⚽','🏀','🎾','🏊','🧘','💪','🏃','🧗','🎯','🥊','🏄','🎿','🏇','🚴','🤸','🏌️',
-  // Symbols & Misc
   '🛡️','⚔️','🔑','🗝️','🔐','💌','📣','📢','🚦','✅','❌','💯','🆕','🔔','🎁','🎖️',
-  // Animals
   '🦁','🐯','🦊','🐺','🦋','🦅','🐉','🦄','🐸','🦁','🐧','🦜','🐬','🦈','🦒','🦓',
-  // More fun
   '👾','🤖','👻','💀','🎃','🌈','🔭','🧬','⚗️','🧲','💊','🔬','🏅','🎗️','🧩','🎲',
 ];
 
@@ -115,7 +107,7 @@ async function sbPush(key: string, val: unknown) {
   } catch(e) { console.warn('Supabase push failed:', e); }
 }
 
-// ── Task migration (completed:boolean → status:TaskStatus) ────────
+// ── Task migration ────────────────────────────────────────────────
 function migrateTasks(tasks: Task[]): Task[] {
   return tasks.map(t => ({
     ...t,
@@ -138,30 +130,35 @@ const DEFAULT_COSTS: CostItem[] = [
   {id:genId(),name:'Web Hosting',amount:250,category:'Hosting'},
 ];
 
+// ── Transaction helper ────────────────────────────────────────────
+function mkTransaction(description: string, amount: number, type: 'income'|'expense', category: string): Transaction {
+  return { id: genId(), date: todayStr(), description, amount, type, category, createdAt: new Date().toISOString() };
+}
+
 // ══════════════════════════════════════════════════════════════════
 // MAIN STORE
 // ══════════════════════════════════════════════════════════════════
 export function useStore() {
-  const [clients,setClients]                     = useState<Client[]>(()=>migrateClients(load(K.clients,DEFAULT_CLIENTS)));
-  const [events,setEvents]                       = useState<CalendarEvent[]>(()=>load(K.events,[]));
-  const [costs,setCosts]                         = useState<CostItem[]>(()=>load(K.costs,DEFAULT_COSTS));
-  const [devProjects,setDevProjects]             = useState<DevProject[]>(()=>load(K.devProjects,[]));
-  const [budgetIncome,setBudgetIncome]           = useState<BudgetIncomeItem[]>(()=>load(K.budgetInc,[]));
-  const [budgetExpenses,setBudgetExpenses]       = useState<BudgetExpenseItem[]>(()=>load(K.budgetExp,[]));
-  const [unforeseenExpenses,setUnforeseen]       = useState<UnforeseenExpense[]>(()=>load(K.unforeseen,[]));
-  const [onceOffCosts,setOnceOffCosts]           = useState<OnceOffCost[]>(()=>load(K.onceOff,[]));
-  const [monthlySnapshots,setSnapshots]          = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
-  const [meetingNotes,setMeetingNotes]           = useState<MeetingNote[]>(()=>load(K.notes,[]));
-  const [priceList,setPriceList]                 = useState<PriceListItem[]>(()=>load(K.priceList,[]));
-  const [oddTasks,setOddTasks]                   = useState<OddTask[]>(()=>load(K.oddTasks,[]));
+  const [clients,setClients]                       = useState<Client[]>(()=>migrateClients(load(K.clients,DEFAULT_CLIENTS)));
+  const [events,setEvents]                         = useState<CalendarEvent[]>(()=>load(K.events,[]));
+  const [costs,setCosts]                           = useState<CostItem[]>(()=>load(K.costs,DEFAULT_COSTS));
+  const [devProjects,setDevProjects]               = useState<DevProject[]>(()=>load(K.devProjects,[]));
+  const [budgetIncome,setBudgetIncome]             = useState<BudgetIncomeItem[]>(()=>load(K.budgetInc,[]));
+  const [budgetExpenses,setBudgetExpenses]         = useState<BudgetExpenseItem[]>(()=>load(K.budgetExp,[]));
+  const [unforeseenExpenses,setUnforeseen]         = useState<UnforeseenExpense[]>(()=>load(K.unforeseen,[]));
+  const [onceOffCosts,setOnceOffCosts]             = useState<OnceOffCost[]>(()=>load(K.onceOff,[]));
+  const [monthlySnapshots,setSnapshots]            = useState<MonthlySnapshot[]>(()=>load(K.snapshots,[]));
+  const [meetingNotes,setMeetingNotes]             = useState<MeetingNote[]>(()=>load(K.notes,[]));
+  const [priceList,setPriceList]                   = useState<PriceListItem[]>(()=>load(K.priceList,[]));
+  const [oddTasks,setOddTasks]                     = useState<OddTask[]>(()=>load(K.oddTasks,[]));
   const [incomeSubscriptions,setIncomeSubscriptions] = useState<IncomeSubscription[]>(()=>load(K.incSubs,[]));
-  // Balance stored as a single-element array to reuse the same Firebase sync infrastructure
-  const [currentBalance,setCurrentBalance]        = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
-  const [fbReady,setFbReady]                     = useState(false);
-  const [fbError,setFbError]                     = useState<string|null>(null);
+  const [customers,setCustomers]                   = useState<Customer[]>(()=>load(K.customers,[]));
+  const [unexpectedIncome,setUnexpectedIncome]     = useState<UnexpectedIncome[]>(()=>load(K.unexpectedInc,[]));
+  const [transactions,setTransactions]             = useState<Transaction[]>(()=>load(K.transactions,[]));
+  const [currentBalance,setCurrentBalance]         = useState<number>(()=>{ const v=load(K.balance,[0]); return Array.isArray(v)?v[0]:typeof v==='number'?v:0; });
+  const [fbReady,setFbReady]                       = useState(false);
+  const [fbError,setFbError]                       = useState<string|null>(null);
   const isFirebaseConfigured = true;
-  // Track which collection keys are being updated from Firebase so we don't
-  // push stale localStorage data back after receiving a remote snapshot.
   const remoteUpdateKeys = useRef(new Set<string>());
 
   const persistAndSync = (localKey: string, sbKey: string, value: unknown) => {
@@ -188,7 +185,9 @@ export function useStore() {
   useEffect(()=>{persistAndSync(K.priceList,'priceList',priceList);},[priceList,fbReady]);
   useEffect(()=>{persistAndSync(K.oddTasks,'oddTasks',oddTasks);},[oddTasks,fbReady]);
   useEffect(()=>{persistAndSync(K.incSubs,'incomeSubscriptions',incomeSubscriptions);},[incomeSubscriptions,fbReady]);
-  // Balance wrapped in array so it flows through the same persistAndSync infrastructure
+  useEffect(()=>{persistAndSync(K.customers,'customers',customers);},[customers,fbReady]);
+  useEffect(()=>{persistAndSync(K.unexpectedInc,'unexpectedIncome',unexpectedIncome);},[unexpectedIncome,fbReady]);
+  useEffect(()=>{persistAndSync(K.transactions,'transactions',transactions);},[transactions,fbReady]);
   useEffect(()=>{persistAndSync(K.balance,'currentBalance',[currentBalance]);},[currentBalance,fbReady]);
 
   // ── Supabase realtime listener ────────────────────────────────
@@ -208,10 +207,12 @@ export function useStore() {
       priceList:(v)=>setPriceList(v as PriceListItem[]),
       oddTasks:(v)=>setOddTasks(v as OddTask[]),
       incomeSubscriptions:(v)=>setIncomeSubscriptions(v as IncomeSubscription[]),
+      customers:(v)=>setCustomers(v as Customer[]),
+      unexpectedIncome:(v)=>setUnexpectedIncome(v as UnexpectedIncome[]),
+      transactions:(v)=>setTransactions(v as Transaction[]),
       currentBalance:(v)=>{ const arr=v as number[]; if(Array.isArray(arr)&&arr.length>0) setCurrentBalance(arr[0]); },
     };
 
-    // Handle an incoming row from realtime or initial fetch
     function applyRow(key: string, value: unknown) {
       const setter = setters[key];
       if (setter && Array.isArray(value) && value.length > 0) {
@@ -220,7 +221,6 @@ export function useStore() {
       }
     }
 
-    // Subscribe first so we don't miss any changes that arrive during the fetch
     const channel = sb
       .channel('app-data')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_data' },
@@ -229,7 +229,6 @@ export function useStore() {
         (p) => applyRow((p.new as {key:string}).key, (p.new as {value:unknown}).value))
       .subscribe();
 
-    // Fetch all current data in one round-trip, then mark ready
     sb.from('app_data').select('key, value').then(({ data, error }) => {
       if (error) {
         console.warn('Supabase load error:', error.message);
@@ -244,18 +243,31 @@ export function useStore() {
     return () => { sb.removeChannel(channel); };
   },[]);
 
+  // ── Transaction log helpers ──────────────────────────────────────
+  const addTransaction = (t: Transaction) => setTransactions(p=>[...p,t].sort((a,b)=>b.date.localeCompare(a.date)));
+  const removeTransaction = (sourceDesc: string, type: 'income'|'expense') =>
+    setTransactions(p=>p.filter(t=>!(t.description===sourceDesc&&t.type===type)));
+
   // ── CLIENTS ──────────────────────────────────────────────────────
   const addClient=(name:string)=>{
     const idx=clients.length%PRESET_COLORS.length;
     setClients(p=>[...p,{id:genId(),name,color:PRESET_COLORS[idx],icon:PRESET_ICONS[idx],tasks:[],monthlyIncome:0,adSpend:0,monthlyCost:0}]);
   };
   const deleteClient=(id:string)=>setClients(p=>p.filter(c=>c.id!==id));
-  const toggleClientPaid=(id:string)=>setClients(p=>p.map(c=>c.id===id?{...c,paidThisMonth:!c.paidThisMonth}:c));
+  const toggleClientPaid=(id:string)=>{
+    const client = clients.find(c=>c.id===id);
+    if (!client) return;
+    const nowPaid = !client.paidThisMonth;
+    setClients(p=>p.map(c=>c.id===id?{...c,paidThisMonth:nowPaid}:c));
+    if (nowPaid) addTransaction(mkTransaction(`Retainer — ${client.name}`, client.monthlyIncome, 'income', 'Retainer'));
+    else removeTransaction(`Retainer — ${client.name}`, 'income');
+  };
   const resetMonthlyPayments=()=>{
     setClients(p=>p.map(c=>({...c,paidThisMonth:false,adSpendPaid:false})));
     setCosts(p=>p.map(c=>({...c,paid:false})));
     setBudgetIncome(p=>p.map(i=>({...i,paid:false})));
     setBudgetExpenses(p=>p.map(e=>({...e,paid:false})));
+    setIncomeSubscriptions(p=>p.map(s=>({...s,paid:false})));
   };
   const updateClientName=(id:string,name:string)=>setClients(p=>p.map(c=>c.id===id?{...c,name}:c));
   const updateClientColor=(id:string,color:string)=>setClients(p=>p.map(c=>c.id===id?{...c,color}:c));
@@ -274,14 +286,21 @@ export function useStore() {
     setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,title,dueDate}:t)}:c));
   const assignTask=(cid:string,tid:string,userId:string|undefined)=>
     setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,assignedTo:userId}:t)}:c));
-  const updateTaskStatus=(cid:string,tid:string,status:TaskStatus)=>
-    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,status}:t)}:c));
+  const updateTaskStatus=(cid:string,tid:string,status:TaskStatus,delayReason?:string)=>
+    setClients(p=>p.map(c=>c.id===cid?{...c,tasks:c.tasks.map(t=>t.id===tid?{...t,status,delayReason:status==='delayed'?delayReason:undefined}:t)}:c));
 
   // ── BUSINESS COSTS ────────────────────────────────────────────────
   const addCost=(name:string,amount:number,category:string)=>setCosts(p=>[...p,{id:genId(),name,amount,category,paid:false}]);
   const deleteCost=(id:string)=>setCosts(p=>p.filter(c=>c.id!==id));
   const updateCost=(id:string,name:string,amount:number,category:string)=>setCosts(p=>p.map(c=>c.id===id?{...c,name,amount,category}:c));
-  const toggleCostPaid=(id:string)=>setCosts(p=>p.map(c=>c.id===id?{...c,paid:!c.paid}:c));
+  const toggleCostPaid=(id:string)=>{
+    const item = costs.find(c=>c.id===id);
+    if (!item) return;
+    const nowPaid = !item.paid;
+    setCosts(p=>p.map(c=>c.id===id?{...c,paid:nowPaid}:c));
+    if (nowPaid) addTransaction(mkTransaction(item.name, item.amount, 'expense', item.category));
+    else removeTransaction(item.name, 'expense');
+  };
   const toggleClientAdSpendPaid=(id:string)=>setClients(p=>p.map(c=>c.id===id?{...c,adSpendPaid:!c.adSpendPaid}:c));
 
   // ── ONCE-OFF COSTS ────────────────────────────────────────────────
@@ -290,12 +309,19 @@ export function useStore() {
   const deleteOnceOffCost=(id:string)=>setOnceOffCosts(p=>p.filter(c=>c.id!==id));
   const updateOnceOffCost=(id:string,name:string,amount:number,dueDate:string,notes:string)=>
     setOnceOffCosts(p=>p.map(c=>c.id===id?{...c,name,amount,dueDate,notes}:c));
-  const toggleOnceOffPaid=(id:string)=>setOnceOffCosts(p=>p.map(c=>c.id===id?{...c,paid:!c.paid}:c));
+  const toggleOnceOffPaid=(id:string)=>{
+    const item = onceOffCosts.find(c=>c.id===id);
+    if (!item) return;
+    const nowPaid = !item.paid;
+    setOnceOffCosts(p=>p.map(c=>c.id===id?{...c,paid:nowPaid}:c));
+    if (nowPaid) addTransaction(mkTransaction(`Once-off: ${item.name}`, item.amount, 'expense', 'Once-off'));
+    else removeTransaction(`Once-off: ${item.name}`, 'expense');
+  };
 
   // ── DEV PROJECTS ──────────────────────────────────────────────────
-  const addDevProject=(clientName:string,projectName:string)=>{
+  const addDevProject=(clientName:string,projectName:string,category:'web'|'app'='web')=>{
     const idx=devProjects.length%PRESET_COLORS.length;
-    setDevProjects(p=>[...p,{id:genId(),clientName,projectName,color:PRESET_COLORS[(idx+6)%PRESET_COLORS.length],icon:PRESET_ICONS[(idx+8)%PRESET_ICONS.length],status:'active',depositAmount:0,depositPaid:false,finalAmount:0,finalPaid:false,tasks:[],createdAt:new Date().toISOString()}]);
+    setDevProjects(p=>[...p,{id:genId(),clientName,projectName,category,color:PRESET_COLORS[(idx+6)%PRESET_COLORS.length],icon:PRESET_ICONS[(idx+8)%PRESET_ICONS.length],status:'active',depositAmount:0,depositPaid:false,finalAmount:0,finalPaid:false,tasks:[],createdAt:new Date().toISOString()}]);
   };
   const deleteDevProject=(id:string)=>setDevProjects(p=>p.filter(x=>x.id!==id));
   const updateDevProject=(id:string,changes:Partial<DevProject>)=>setDevProjects(p=>p.map(x=>x.id===id?{...x,...changes}:x));
@@ -326,14 +352,12 @@ export function useStore() {
   const updateBudgetIncome=(id:string,name:string,amount:number,category:BudgetIncomeCategory,recurring:boolean)=>
     setBudgetIncome(p=>p.map(i=>i.id===id?{...i,name,amount,category,recurring}:i));
   const toggleBudgetIncomePaid=(id:string)=>setBudgetIncome(p=>p.map(i=>i.id===id?{...i,paid:!i.paid}:i));
-
   const addBudgetExpense=(name:string,amount:number,category:BudgetExpenseCategory,recurring:boolean)=>
     setBudgetExpenses(p=>[...p,{id:genId(),name,amount,category,recurring,paid:false}]);
   const deleteBudgetExpense=(id:string)=>setBudgetExpenses(p=>p.filter(e=>e.id!==id));
   const updateBudgetExpense=(id:string,name:string,amount:number,category:BudgetExpenseCategory,recurring:boolean)=>
     setBudgetExpenses(p=>p.map(e=>e.id===id?{...e,name,amount,category,recurring}:e));
   const toggleBudgetExpensePaid=(id:string)=>setBudgetExpenses(p=>p.map(e=>e.id===id?{...e,paid:!e.paid}:e));
-
   const addUnforeseen=(name:string,amount:number,date:string,notes:string)=>
     setUnforeseen(p=>[...p,{id:genId(),name,amount,date,notes,paid:false}]);
   const deleteUnforeseen=(id:string)=>setUnforeseen(p=>p.filter(e=>e.id!==id));
@@ -364,7 +388,6 @@ export function useStore() {
       personalBalance:budgetBalance,
       notes,
     };
-    // Replace if same month already exists
     setSnapshots(p=>{
       const existing=p.findIndex(s=>s.monthKey===key);
       if(existing>=0){const n=[...p];n[existing]=snap;return n;}
@@ -396,17 +419,50 @@ export function useStore() {
   const deleteOddTask=(id:string)=>setOddTasks(p=>p.filter(t=>t.id!==id));
   const updateOddTask=(id:string,title:string,dueDate:string,notes:string,priority:OddTaskPriority)=>
     setOddTasks(p=>p.map(t=>t.id===id?{...t,title,dueDate,notes,priority}:t));
-  const updateOddTaskStatus=(id:string,status:TaskStatus)=>
-    setOddTasks(p=>p.map(t=>t.id===id?{...t,status}:t));
+  const updateOddTaskStatus=(id:string,status:TaskStatus,delayReason?:string)=>
+    setOddTasks(p=>p.map(t=>t.id===id?{...t,status,delayReason:status==='delayed'?delayReason:undefined}:t));
   const assignOddTask=(id:string,userId:string|undefined)=>
     setOddTasks(p=>p.map(t=>t.id===id?{...t,assignedTo:userId}:t));
 
   // ── INCOME SUBSCRIPTIONS ──────────────────────────────────────────
   const addIncomeSubscription=(customerName:string,amount:number,invoiceDate:string)=>
-    setIncomeSubscriptions(p=>[...p,{id:genId(),customerName,amount,invoiceDate,createdAt:new Date().toISOString()}]);
+    setIncomeSubscriptions(p=>[...p,{id:genId(),customerName,amount,invoiceDate,paid:false,createdAt:new Date().toISOString()}]);
   const deleteIncomeSubscription=(id:string)=>setIncomeSubscriptions(p=>p.filter(s=>s.id!==id));
   const updateIncomeSubscription=(id:string,customerName:string,amount:number,invoiceDate:string)=>
     setIncomeSubscriptions(p=>p.map(s=>s.id===id?{...s,customerName,amount,invoiceDate}:s));
+  const toggleIncomeSubPaid=(id:string)=>{
+    const item = incomeSubscriptions.find(s=>s.id===id);
+    if (!item) return;
+    const nowPaid = !item.paid;
+    setIncomeSubscriptions(p=>p.map(s=>s.id===id?{...s,paid:nowPaid}:s));
+    if (nowPaid) addTransaction(mkTransaction(`Income: ${item.customerName}`, item.amount, 'income', 'Subscription'));
+    else removeTransaction(`Income: ${item.customerName}`, 'income');
+  };
+
+  // ── CUSTOMERS ─────────────────────────────────────────────────────
+  const addCustomer=(name:string,company?:string,email?:string,phone?:string,address?:string,notes?:string)=>
+    setCustomers(p=>[...p,{id:genId(),name,company,email,phone,address,notes,createdAt:new Date().toISOString()}]);
+  const deleteCustomer=(id:string)=>setCustomers(p=>p.filter(c=>c.id!==id));
+  const updateCustomer=(id:string,name:string,company?:string,email?:string,phone?:string,address?:string,notes?:string)=>
+    setCustomers(p=>p.map(c=>c.id===id?{...c,name,company,email,phone,address,notes}:c));
+
+  // ── UNEXPECTED INCOME ─────────────────────────────────────────────
+  const addUnexpectedIncome=(name:string,amount:number,date:string,notes:string)=>
+    setUnexpectedIncome(p=>[...p,{id:genId(),name,amount,date,notes,paid:false,createdAt:new Date().toISOString()}]);
+  const deleteUnexpectedIncome=(id:string)=>setUnexpectedIncome(p=>p.filter(i=>i.id!==id));
+  const updateUnexpectedIncome=(id:string,name:string,amount:number,date:string,notes:string)=>
+    setUnexpectedIncome(p=>p.map(i=>i.id===id?{...i,name,amount,date,notes}:i));
+  const toggleUnexpectedIncomePaid=(id:string)=>{
+    const item = unexpectedIncome.find(i=>i.id===id);
+    if (!item) return;
+    const nowPaid = !item.paid;
+    setUnexpectedIncome(p=>p.map(i=>i.id===id?{...i,paid:nowPaid}:i));
+    if (nowPaid) addTransaction(mkTransaction(`Unexpected: ${item.name}`, item.amount, 'income', 'Unexpected'));
+    else removeTransaction(`Unexpected: ${item.name}`, 'income');
+  };
+
+  // ── TRANSACTIONS ──────────────────────────────────────────────────
+  const clearTransactions=()=>setTransactions([]);
 
   // ── COMPUTED ──────────────────────────────────────────────────────
   const totalMonthlyIncome  = clients.reduce((s,c)=>s+c.monthlyIncome,0);
@@ -426,7 +482,6 @@ export function useStore() {
     return s+pending;
   },0);
   const totalProfit         = totalMonthlyIncome - totalAdSpend - totalMonthlyCosts - totalClientCosts;
-  // Available balance only deducts costs/ad-spend that have actually been paid out
   const businessBalance     = currentBalance + totalReceivedIncome - totalPaidAdSpend - totalPaidMonthlyCosts - totalClientCosts - totalOnceOffPaid;
 
   const totalBudgetIncome      = budgetIncome.reduce((s,i)=>s+i.amount,0);
@@ -434,43 +489,25 @@ export function useStore() {
   const totalBudgetExpenses    = budgetExpenses.reduce((s,e)=>s+e.amount,0);
   const totalPaidBudgetExpenses= budgetExpenses.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
   const totalUnforeseen        = unforeseenExpenses.filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0);
-  // Budget balance uses paid/received amounts so it stays accurate to what has actually moved
   const budgetBalance          = totalPaidBudgetIncome - totalPaidBudgetExpenses - totalUnforeseen;
 
-  // Cumulative totals across all snapshots
-  // businessIncome = retainer only, devIncome stored separately — sum both for true income total
   const allTimeBusinessIncome  = monthlySnapshots.reduce((s,sn)=>s+(sn.businessIncome||0)+(sn.devIncome||0),0);
-  // businessProfit snapshot only covers retainer profit; add devIncome for true net profit
   const allTimeBusinessProfit  = monthlySnapshots.reduce((s,sn)=>s+(sn.businessProfit||0)+(sn.devIncome||0),0);
-  // Personal balance: sum of each month's surplus/deficit
   const allTimePersonalBalance = monthlySnapshots.reduce((s,sn)=>s+(sn.personalBalance||0),0);
+
+  // Money in/out for the Home dashboard bars (only paid items)
+  const totalPaidIncome = totalReceivedIncome
+    + incomeSubscriptions.filter(s=>s.paid).reduce((s,i)=>s+i.amount,0)
+    + unexpectedIncome.filter(i=>i.paid).reduce((s,i)=>s+i.amount,0);
+  const totalPaidExpenses = totalPaidMonthlyCosts
+    + totalPaidAdSpend
+    + totalClientCosts
+    + totalOnceOffPaid;
 
   const t0=todayStr();
   const overdueCount = clients.reduce((n,c)=>
-    n+c.tasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t0).length,0)
-    + oddTasks.filter(tk=>tk.status!=='completed'&&tk.dueDate<t0).length;
-
-  // Explicitly push all local state to Firebase — use when data is stuck locally
-  // and hasn't made it to the cloud (e.g. after a race condition wiped Firestore).
-  async function forceSyncToFirebase() {
-    if (!fbReady) return;
-    await Promise.all([
-      sbPush('clients',              clients),
-      sbPush('events',               events),
-      sbPush('costs',                costs),
-      sbPush('devProjects',          devProjects),
-      sbPush('budgetIncome',         budgetIncome),
-      sbPush('budgetExpenses',       budgetExpenses),
-      sbPush('unforeseenExpenses',   unforeseenExpenses),
-      sbPush('onceOffCosts',         onceOffCosts),
-      sbPush('monthlySnapshots',     monthlySnapshots),
-      sbPush('meetingNotes',         meetingNotes),
-      sbPush('priceList',            priceList),
-      sbPush('oddTasks',             oddTasks),
-      sbPush('incomeSubscriptions',  incomeSubscriptions),
-      sbPush('currentBalance',       [currentBalance]),
-    ]);
-  }
+    n+c.tasks.filter(tk=>tk.status!=='completed'&&tk.status!=='delayed'&&tk.dueDate<t0).length,0)
+    + oddTasks.filter(tk=>tk.status!=='completed'&&tk.status!=='delayed'&&tk.dueDate<t0).length;
 
   return {
     clients,events,costs,devProjects,
@@ -495,7 +532,10 @@ export function useStore() {
     addMeetingNote,deleteMeetingNote,updateMeetingNote,
     priceList,addPriceItem,deletePriceItem,updatePriceItem,
     oddTasks,addOddTask,deleteOddTask,updateOddTask,updateOddTaskStatus,assignOddTask,
-    incomeSubscriptions,addIncomeSubscription,deleteIncomeSubscription,updateIncomeSubscription,
+    incomeSubscriptions,addIncomeSubscription,deleteIncomeSubscription,updateIncomeSubscription,toggleIncomeSubPaid,
+    customers,addCustomer,deleteCustomer,updateCustomer,
+    unexpectedIncome,addUnexpectedIncome,deleteUnexpectedIncome,updateUnexpectedIncome,toggleUnexpectedIncomePaid,
+    transactions,clearTransactions,
     totalMonthlyIncome,totalReceivedIncome,
     totalAdSpend,totalPaidAdSpend,
     totalMonthlyCosts,totalPaidMonthlyCosts,
@@ -506,6 +546,7 @@ export function useStore() {
     totalBudgetExpenses,totalPaidBudgetExpenses,
     totalUnforeseen,budgetBalance,
     allTimeBusinessIncome,allTimeBusinessProfit,allTimePersonalBalance,
+    totalPaidIncome,totalPaidExpenses,
     overdueCount,
   };
 }

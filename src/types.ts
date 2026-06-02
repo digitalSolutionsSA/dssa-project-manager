@@ -1,17 +1,17 @@
 // ── Auth ──────────────────────────────────────────────────────────
 export type UserRole   = 'admin' | 'assistant';
-export type TaskStatus = 'not-started' | 'in-progress' | 'completed';
+export type TaskStatus = 'not-started' | 'in-progress' | 'completed' | 'delayed';
 
 export interface AppUser {
   id: string;
   username: string;
-  pinHash: string;        // SHA-256 hex of the PIN
+  pinHash: string;
   role: UserRole;
   displayName: string;
   createdAt: string;
-  calendarAccess?: boolean;  // assistant can view calendar tab
-  tasksAccess?: boolean;     // assistant can view tasks tab (default: true)
-  pricesAccess?: boolean;    // assistant can view price list tab (default: false)
+  calendarAccess?: boolean;
+  tasksAccess?: boolean;
+  pricesAccess?: boolean;
 }
 
 // ── Retainer Clients ─────────────────────────────────────────────
@@ -20,8 +20,9 @@ export interface Task {
   title: string;
   dueDate: string;
   status: TaskStatus;
-  completed?: boolean;    // legacy field — read during migration only
-  assignedTo?: string;    // AppUser.id
+  completed?: boolean;    // legacy field
+  assignedTo?: string;
+  delayReason?: string;
   createdAt: string;
 }
 
@@ -34,8 +35,8 @@ export interface Client {
   monthlyIncome: number;
   adSpend: number;
   monthlyCost: number;
-  paidThisMonth?: boolean;  // must be ticked before income counts toward balance
-  adSpendPaid?: boolean;    // ad spend only deducted from balance when marked paid
+  paidThisMonth?: boolean;
+  adSpendPaid?: boolean;
 }
 
 // ── Business Monthly Costs ────────────────────────────────────────
@@ -52,7 +53,7 @@ export interface OnceOffCost {
   id: string;
   name: string;
   amount: number;
-  dueDate: string;     // YYYY-MM-DD
+  dueDate: string;
   paid: boolean;
   notes: string;
   createdAt: string;
@@ -79,6 +80,7 @@ export interface DevProject {
   color: string;
   icon: string;
   status: 'active' | 'completed';
+  category?: 'web' | 'app';   // undefined treated as 'web' for backward compat
   depositAmount: number;
   depositPaid: boolean;
   finalAmount: number;
@@ -166,7 +168,7 @@ export interface PriceListItem {
   category: PriceCategory;
   price: number;
   description: string;
-  visibleTo: 'all' | string[];  // 'all' = every assistant; string[] = specific user IDs
+  visibleTo: 'all' | string[];
   createdAt: string;
 }
 
@@ -177,10 +179,11 @@ export interface OddTask {
   id: string;
   title: string;
   notes: string;
-  dueDate: string;           // YYYY-MM-DD
+  dueDate: string;
   status: TaskStatus;
-  assignedTo?: string;       // AppUser.id — undefined = admin's own task
+  assignedTo?: string;
   priority: OddTaskPriority;
+  delayReason?: string;
   createdAt: string;
 }
 
@@ -201,6 +204,41 @@ export interface IncomeSubscription {
   id: string;
   customerName: string;
   amount: number;
-  invoiceDate: string; // YYYY-MM-DD
+  invoiceDate: string;
+  paid?: boolean;
+  createdAt: string;
+}
+
+// ── Customers (CRM) ───────────────────────────────────────────────
+export interface Customer {
+  id: string;
+  name: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+// ── Unexpected Income ─────────────────────────────────────────────
+export interface UnexpectedIncome {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  notes: string;
+  paid: boolean;
+  createdAt: string;
+}
+
+// ── Transaction Log ───────────────────────────────────────────────
+export interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
   createdAt: string;
 }
