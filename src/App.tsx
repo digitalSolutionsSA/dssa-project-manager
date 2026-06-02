@@ -1154,8 +1154,8 @@ function AdminApp({ auth }: { auth: ReturnType<typeof useAuth> }) {
               onDeleteSub={deleteIncomeSubscription}
               onUpdateSub={updateIncomeSubscription}
               devProjects={devProjects}
-              onToggleDepositPaid={id=>updateDevProject(id,{depositPaid:!devProjects.find(p=>p.id===id)?.depositPaid})}
-              onToggleFinalPaid={id=>updateDevProject(id,{finalPaid:!devProjects.find(p=>p.id===id)?.finalPaid})}
+              onToggleDepositPaid={(id:string)=>updateDevProject(id,{depositPaid:!devProjects.find(p=>p.id===id)?.depositPaid})}
+              onToggleFinalPaid={(id:string)=>updateDevProject(id,{finalPaid:!devProjects.find(p=>p.id===id)?.finalPaid})}
               unexpectedIncome={unexpectedIncome}
               onToggleUnexpectedPaid={toggleUnexpectedIncomePaid}
               onAddUnexpected={addUnexpectedIncome}
