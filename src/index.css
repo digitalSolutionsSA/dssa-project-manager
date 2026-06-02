@@ -3261,6 +3261,31 @@ input, select, textarea {
 .task-tile-badge.inprog  { color: #ec4899; }
 .task-tile-badge.delayed { color: var(--amber); }
 
+.task-tile-due {
+  font-size: 0.65rem; color: var(--text4);
+  display: block; margin-top: 2px;
+}
+
+/* Once-off tile wrapper for positioning the edit button */
+.task-tile-wrap {
+  position: relative;
+  display: flex;
+}
+.task-tile-wrap .task-tile {
+  flex: 1;
+}
+.oncoff-edit-btn {
+  position: absolute !important;
+  top: 4px; right: 4px;
+  width: 18px !important; height: 18px !important;
+  font-size: 0.7rem !important;
+  opacity: 0;
+  transition: opacity 0.13s;
+  z-index: 2;
+  padding: 0 !important;
+}
+.task-tile-wrap:hover .oncoff-edit-btn { opacity: 1; }
+
 /* Empty state */
 .home-tasks-empty-tile {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -3390,6 +3415,58 @@ input, select, textarea {
 ══════════════════════════════════════════════════════════════════ */
 .home-oncoff {
   background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r2); overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INVOICE REMINDER MODAL
+══════════════════════════════════════════════════════════════════ */
+.invoice-reminder-overlay {
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+.invoice-reminder-modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--r2);
+  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+.irm-header {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.irm-header .irm-icon { color: #f59e0b; flex-shrink: 0; margin-top: 2px; }
+.irm-title { font-size: 1.15rem; font-weight: 700; color: var(--text); }
+.irm-sub { font-size: 0.82rem; color: var(--text3); margin-top: 3px; }
+
+.irm-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.irm-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px 14px;
+}
+.irm-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.irm-icon-emoji { font-size: 1.1rem; flex-shrink: 0; }
+.irm-client-info { flex: 1; min-width: 0; }
+.irm-client-name { display: block; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.irm-amount {
+  display: block; font-size: 1rem; font-weight: 700; color: #10b981;
+  margin-top: 2px;
+}
+.irm-btn {
+  padding: 8px 16px !important;
+  font-size: 0.8rem !important;
+  flex-shrink: 0;
+}
+.irm-note {
+  font-size: 0.75rem; color: var(--text4);
+  text-align: center; margin: 0;
+  padding-top: 12px; border-top: 1px solid var(--border);
 }
 
 /* ══════════════════════════════════════════════════════════════════

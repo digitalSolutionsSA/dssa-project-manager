@@ -111,7 +111,12 @@ export default function Sidebar({ activePage, onNavigate, displayName, onLogout,
     <aside className="sidebar">
       {/* Logo — centred */}
       <div className="sb-logo-wrap">
-        <img src="/logo-bg.png" alt="Digital Solutions SA" className="sb-logo" />
+        <img
+          src="/logo-bg.png"
+          alt="Digital Solutions SA"
+          className="sb-logo"
+          onError={e => { (e.target as HTMLImageElement).src = '/logo.png'; }}
+        />
       </div>
 
       {/* Date / Time */}

@@ -37,10 +37,10 @@ function Arc({ pct, color, r, sw }: { pct: number; color: string; r: number; sw:
 
 // ── Ring + side legend card ────────────────────────────────────────
 function RingCard({ stats, title }: { stats: TaskStats; title: string }) {
-  const size = 120;
+  const size = 160;
   const cx   = size / 2;
-  const sw   = 11;
-  const gap  = 4;
+  const sw   = 14;
+  const gap  = 5;
   const r1   = cx - sw / 2 - 2;
   const r2   = r1 - sw - gap;
   const r3   = r2 - sw - gap;
@@ -53,7 +53,7 @@ function RingCard({ stats, title }: { stats: TaskStats; title: string }) {
   const rows = [
     { label: 'Completed',   color: '#10b981', pct: completionPct, count: stats.completed },
     { label: 'In Progress', color: '#6366f1', pct: inProgressPct, count: stats.inProgress },
-    { label: 'On Track',    color: '#f59e0b', pct: onTimePct,     count: openTasks - stats.overdue },
+    { label: 'Overdue',     color: '#ef4444', pct: stats.total > 0 ? (stats.overdue / stats.total) * 100 : 0, count: stats.overdue },
   ];
 
   return (
@@ -70,12 +70,12 @@ function RingCard({ stats, title }: { stats: TaskStats; title: string }) {
               <g transform={`translate(${cx},${cx})`}>
                 <Arc pct={completionPct} color="#10b981" r={r1} sw={sw} />
                 <Arc pct={inProgressPct} color="#6366f1" r={r2} sw={sw} />
-                <Arc pct={onTimePct}     color="#f59e0b" r={r3} sw={sw} />
+                <Arc pct={stats.total > 0 ? (stats.overdue / stats.total) * 100 : 0} color="#ef4444" r={r3} sw={sw} />
               </g>
-              <text x={cx} y={cx - 5}  textAnchor="middle" fontSize="18" fontWeight="700" fill="var(--text)">
+              <text x={cx} y={cx - 6}  textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--text)">
                 {Math.round(completionPct)}%
               </text>
-              <text x={cx} y={cx + 13} textAnchor="middle" fontSize="10" fill="var(--text3)">done</text>
+              <text x={cx} y={cx + 14} textAnchor="middle" fontSize="11" fill="var(--text3)">done</text>
             </svg>
           </div>
 
@@ -98,19 +98,6 @@ function RingCard({ stats, title }: { stats: TaskStats; title: string }) {
                 <span className="wdr-count">({row.count})</span>
               </div>
             ))}
-            {stats.overdue > 0 && (
-              <div className="wd-ring-stat-row overdue-row">
-                <span className="wdr-dot" style={{ background: '#ef4444' }} />
-                <span className="wdr-label">Overdue</span>
-                <div className="wdr-bar-wrap">
-                  <div className="wdr-bar">
-                    <div className="wdr-bar-fill" style={{ width: `${(stats.overdue / stats.total) * 100}%`, background: '#ef4444' }} />
-                  </div>
-                </div>
-                <span className="wdr-pct" style={{ color: '#ef4444' }}>{Math.round((stats.overdue / stats.total) * 100)}%</span>
-                <span className="wdr-count">({stats.overdue})</span>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -143,45 +130,6 @@ export default function WorkloadDashboard({ clients, oddTasks, users }: {
         ))}
       </div>
 
-      {/* Per-client breakdown */}
-      {clients.length > 0 && (
-        <div className="wd-client-breakdown">
-          <div className="wd-section-subtitle">Client Task Breakdown</div>
-          <div className="wd-client-grid">
-            {clients.map(c => {
-              const s = computeStats(c.tasks);
-              const pct = s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0;
-              const inProgPct = s.total > 0 ? Math.round((s.inProgress / s.total) * 100) : 0;
-              return (
-                <div key={c.id} className="wd-client-row">
-                  <span className="wd-client-icon" style={{ background: c.color }}>{c.icon}</span>
-                  <span className="wd-client-name">{c.name}</span>
-                  <div className="wd-client-bars">
-                    <div className="wd-client-bar-row">
-                      <span className="wd-client-bar-lbl">Done</span>
-                      <div className="wd-mini-bar">
-                        <div className="wd-mini-bar-done" style={{ width: `${pct}%`, background: c.color }} />
-                      </div>
-                      <span className="wd-mini-pct">{pct}%</span>
-                    </div>
-                    <div className="wd-client-bar-row">
-                      <span className="wd-client-bar-lbl">Active</span>
-                      <div className="wd-mini-bar">
-                        <div className="wd-mini-bar-done" style={{ width: `${inProgPct}%`, background: '#6366f1' }} />
-                      </div>
-                      <span className="wd-mini-pct">{inProgPct}%</span>
-                    </div>
-                  </div>
-                  <span className="wd-client-counts">
-                    {s.completed}/{s.total}
-                    {s.overdue > 0 && <span className="wd-overdue-flag"> ⚠{s.overdue}</span>}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
