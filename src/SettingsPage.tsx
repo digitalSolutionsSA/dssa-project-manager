@@ -1,88 +1,245 @@
 import { useState } from 'react';
-import { Settings, Eye, EyeOff, RefreshCw, Download, Info } from 'lucide-react';
+import {
+  Plus, Trash2, KeyRound, Users, Check, X, ShieldCheck, UserCog,
+  Tag, ClipboardList, Sun, Moon, Wifi, WifiOff, Settings as SettingsIcon, Calendar,
+} from 'lucide-react';
+import { AppUser, UserRole, ThemeMode } from './types';
 
 interface Props {
-  isDemoMode: boolean;
-  onToggleDemo: () => void;
-  onExport: () => void;
+  users: AppUser[];
+  currentUserId: string;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
   fbReady: boolean;
   fbError: string | null;
-  onForcSync: () => void;
-  appVersion?: string;
+  onAddUser: (username: string, pin: string, role: UserRole, displayName: string) => Promise<void>;
+  onDeleteUser: (id: string) => Promise<void>;
+  onChangePin: (id: string, newPin: string) => Promise<void>;
+  onUpdatePermissions: (id: string, perms: { tasksAccess?: boolean; pricesAccess?: boolean; calendarAccess?: boolean }) => Promise<void>;
 }
 
-export default function SettingsPage({ isDemoMode, onToggleDemo, onExport, fbReady, fbError, onForcSync }: Props) {
-  const [syncing, setSyncing] = useState(false);
+export default function SettingsPage({
+  users, currentUserId, theme, onToggleTheme, fbReady, fbError,
+  onAddUser, onDeleteUser, onChangePin, onUpdatePermissions,
+}: Props) {
+  const [showAdd, setShowAdd]               = useState(false);
+  const [newUsername, setNewUsername]       = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newPin, setNewPin]                 = useState('');
+  const [newRole, setNewRole]               = useState<UserRole>('assistant');
+  const [adding, setAdding]                 = useState(false);
+  const [addError, setAddError]             = useState('');
 
-  const handleForceSync = async () => {
-    setSyncing(true);
-    await onForcSync();
-    setTimeout(() => setSyncing(false), 1500);
-  };
+  const [changingPinFor, setChangingPinFor] = useState<string | null>(null);
+  const [newPinVal, setNewPinVal]           = useState('');
+  const [confirmDelete, setConfirmDelete]   = useState<string | null>(null);
+
+  async function handleAdd() {
+    setAddError('');
+    if (!newUsername.trim()) { setAddError('Username is required.'); return; }
+    if (!/^\d{4,}$/.test(newPin)) { setAddError('PIN must be at least 4 digits.'); return; }
+    const exists = users.some(u => u.username.toLowerCase() === newUsername.trim().toLowerCase());
+    if (exists) { setAddError('That username is already taken.'); return; }
+    setAdding(true);
+    await onAddUser(newUsername.trim(), newPin, newRole, newDisplayName.trim() || newUsername.trim());
+    setNewUsername(''); setNewDisplayName(''); setNewPin(''); setNewRole('assistant');
+    setShowAdd(false); setAdding(false);
+  }
+
+  async function handleChangePin(id: string) {
+    if (!/^\d{4,}$/.test(newPinVal)) return;
+    await onChangePin(id, newPinVal);
+    setChangingPinFor(null);
+    setNewPinVal('');
+  }
+
+  async function handleDelete(id: string) {
+    await onDeleteUser(id);
+    setConfirmDelete(null);
+  }
 
   return (
-    <div className="settings-page">
-      <h2 className="settings-title"><Settings size={20}/> Settings</h2>
-
-      <div className="settings-group">
-        <div className="settings-group-title">Display</div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">Demo Mode</div>
-            <div className="settings-row-sub">Show sample data instead of real data (useful for client presentations)</div>
-          </div>
-          <button className={`settings-toggle ${isDemoMode ? 'on' : ''}`} onClick={onToggleDemo}>
-            {isDemoMode ? <><Eye size={14}/> On</> : <><EyeOff size={14}/> Off</>}
-          </button>
-        </div>
+    <>
+      <div className="page-header">
+        <h1 className="page-title">Settings</h1>
+        <span className="page-subtitle">Appearance, sync &amp; assistant access</span>
       </div>
 
-      <div className="settings-group">
-        <div className="settings-group-title">Data & Sync</div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">Sync Status</div>
-            <div className="settings-row-sub">{fbError ? `Error: ${fbError}` : fbReady ? 'Connected and synced to Supabase' : 'Connecting…'}</div>
+      <main className="settings-page">
+        {/* ── Appearance ─────────────────────────────────────────── */}
+        <section className="settings-section">
+          <div className="tasks-section-head">
+            <SettingsIcon size={16} className="section-icon" />
+            <span>Appearance</span>
           </div>
-          <div className={`settings-badge ${fbError ? 'error' : fbReady ? 'ok' : 'connecting'}`}>
-            {fbError ? 'Error' : fbReady ? 'Synced' : 'Syncing…'}
+          <div className="settings-card">
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-title">Theme</span>
+                <span className="settings-row-sub">Switch between dark and light interface</span>
+              </div>
+              <button className="sb-theme-toggle" onClick={onToggleTheme}>
+                <span className={`sb-theme-track ${theme}`}>
+                  <span className="sb-theme-thumb">
+                    {theme === 'dark' ? <Moon size={12} /> : <Sun size={12} />}
+                  </span>
+                </span>
+                <span className="sb-theme-label">{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
+              </button>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-title">Sync Status</span>
+                <span className="settings-row-sub">Realtime data connection to Supabase</span>
+              </div>
+              <div className={`sb-sync settings-sync ${fbError ? 'error' : fbReady ? 'ok' : 'connecting'}`}>
+                {fbError || !fbReady ? <WifiOff size={14} /> : <Wifi size={14} />}
+                <span>{fbError ? `Error — ${fbError}` : fbReady ? 'Synced' : 'Connecting…'}</span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">Force Sync</div>
-            <div className="settings-row-sub">Push all local data to the cloud (use if data seems out of sync)</div>
-          </div>
-          <button className="btn-ghost" onClick={handleForceSync} disabled={syncing}>
-            <RefreshCw size={13} className={syncing ? 'spin' : ''}/> {syncing ? 'Syncing…' : 'Force Sync'}
-          </button>
-        </div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">Export Report</div>
-            <div className="settings-row-sub">Generate a PDF report of this month's financial data</div>
-          </div>
-          <button className="btn-ghost" onClick={onExport}>
-            <Download size={13}/> Export PDF
-          </button>
-        </div>
-      </div>
+        </section>
 
-      <div className="settings-group">
-        <div className="settings-group-title">About</div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">Digital Solutions SA</div>
-            <div className="settings-row-sub">Project Manager v1.0 · Built with React + Vite + TypeScript</div>
+        {/* ── User Management ───────────────────────────────────── */}
+        <section className="settings-section">
+          <div className="tasks-section-head">
+            <Users size={16} className="section-icon" />
+            <span>Assistants &amp; Access</span>
+            <span className="section-total-of">{users.length}</span>
+            <button className="icon-btn accent" style={{ marginLeft: 'auto' }}
+              onClick={() => { setShowAdd(p => !p); setAddError(''); }} title="Add user">
+              {showAdd ? <X size={16} /> : <Plus size={16} />}
+            </button>
           </div>
-          <Info size={16} style={{color:'var(--text3)'}}/>
-        </div>
-      </div>
 
-      <div className="settings-coming-soon">
-        <Settings size={32}/>
-        <p>More settings coming soon — integrations, notifications, and more.</p>
-      </div>
-    </div>
+          {showAdd && (
+            <div className="user-add-form">
+              <div className="user-add-grid">
+                <div>
+                  <label className="field-label">Username</label>
+                  <input className="field-input" placeholder="e.g. janesmith" value={newUsername}
+                    onChange={e => setNewUsername(e.target.value)} />
+                </div>
+                <div>
+                  <label className="field-label">Display Name</label>
+                  <input className="field-input" placeholder="e.g. Jane Smith" value={newDisplayName}
+                    onChange={e => setNewDisplayName(e.target.value)} />
+                </div>
+                <div>
+                  <label className="field-label">PIN (numbers only)</label>
+                  <input className="field-input" type="password" inputMode="numeric"
+                    placeholder="Min 4 digits" value={newPin}
+                    onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))} />
+                </div>
+                <div>
+                  <label className="field-label">Role</label>
+                  <select className="field-input" value={newRole} onChange={e => setNewRole(e.target.value as UserRole)}>
+                    <option value="assistant">Assistant</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+              {addError && <p className="user-add-error">{addError}</p>}
+              <div className="user-add-actions">
+                <button className="btn-ghost" onClick={() => { setShowAdd(false); setAddError(''); }}>Cancel</button>
+                <button className="btn-primary" onClick={handleAdd} disabled={adding}>
+                  {adding ? 'Adding…' : 'Add User'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="user-list">
+            {users.map(u => (
+              <div key={u.id} className="user-row">
+                <div className={`user-avatar ${u.role}`}>
+                  {u.role === 'admin' ? <ShieldCheck size={16} /> : <UserCog size={16} />}
+                </div>
+
+                <div className="user-info">
+                  <span className="user-name">{u.displayName || u.username}</span>
+                  <span className="user-username">@{u.username}</span>
+                </div>
+
+                <span className={`user-role-badge ${u.role}`}>
+                  {u.role === 'admin' ? 'Admin' : 'Assistant'}
+                </span>
+
+                {u.role === 'assistant' && (
+                  <div className="user-perms">
+                    <button
+                      className={`perm-toggle-btn ${u.tasksAccess !== false ? 'on' : ''}`}
+                      onClick={() => onUpdatePermissions(u.id, { tasksAccess: u.tasksAccess === false ? true : false })}
+                      title={u.tasksAccess !== false ? 'Revoke tasks access' : 'Grant tasks access'}
+                    >
+                      <ClipboardList size={12} />
+                      <span>Tasks</span>
+                    </button>
+                    <button
+                      className={`perm-toggle-btn ${u.pricesAccess ? 'on' : ''}`}
+                      onClick={() => onUpdatePermissions(u.id, { pricesAccess: !u.pricesAccess })}
+                      title={u.pricesAccess ? 'Revoke price list access' : 'Grant price list access'}
+                    >
+                      <Tag size={12} />
+                      <span>Prices</span>
+                    </button>
+                    <button
+                      className={`perm-toggle-btn ${u.calendarAccess !== false ? 'on' : ''}`}
+                      onClick={() => onUpdatePermissions(u.id, { calendarAccess: u.calendarAccess === false ? true : false })}
+                      title={u.calendarAccess !== false ? 'Revoke calendar access' : 'Grant calendar access'}
+                    >
+                      <Calendar size={12} />
+                      <span>Calendar</span>
+                    </button>
+                  </div>
+                )}
+
+                {changingPinFor === u.id ? (
+                  <div className="user-pin-row">
+                    <input
+                      className="field-input user-pin-input"
+                      type="password"
+                      inputMode="numeric"
+                      placeholder="New PIN"
+                      value={newPinVal}
+                      onChange={e => setNewPinVal(e.target.value.replace(/\D/, ''))}
+                      autoFocus
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleChangePin(u.id);
+                        if (e.key === 'Escape') { setChangingPinFor(null); setNewPinVal(''); }
+                      }}
+                    />
+                    <button className="icon-btn accent" onClick={() => handleChangePin(u.id)} title="Save PIN">
+                      <Check size={14} />
+                    </button>
+                    <button className="icon-btn" onClick={() => { setChangingPinFor(null); setNewPinVal(''); }} title="Cancel">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <button className="icon-btn" title="Change PIN" onClick={() => { setChangingPinFor(u.id); setNewPinVal(''); }}>
+                    <KeyRound size={15} />
+                  </button>
+                )}
+
+                {u.id !== currentUserId && (
+                  confirmDelete === u.id ? (
+                    <div className="user-confirm-delete">
+                      <span>Delete?</span>
+                      <button className="btn-danger" onClick={() => handleDelete(u.id)}>Yes</button>
+                      <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>No</button>
+                    </div>
+                  ) : (
+                    <button className="icon-btn red-h" title="Delete user" onClick={() => setConfirmDelete(u.id)}>
+                      <Trash2 size={15} />
+                    </button>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSupabaseClient } from './supabase';
 import { AppUser, UserRole } from './types';
-type UserPermissions = Pick<AppUser, 'calendarAccess' | 'tasksAccess' | 'pricesAccess'>;
+type UserPermissions = Pick<AppUser, 'tasksAccess' | 'pricesAccess' | 'calendarAccess'>;
 
 // ── Helpers ───────────────────────────────────────────────────────
 function genId(): string { return Math.random().toString(36).substring(2, 10); }

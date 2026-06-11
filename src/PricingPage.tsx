@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit3, Check, X, Tag, ChevronDown, ChevronUp, Search, Users } from 'lucide-react';
 import { PriceListItem, PriceCategory, AppUser } from './types';
+import { PRICE_CATEGORIES } from './useStore';
 
-function fmtR(n: number) { return 'R ' + n.toLocaleString('en-ZA'); }
-
-export const PRICE_CATEGORIES: PriceCategory[] = [
-  'Web Development', 'App Development', 'Social Media Marketing', 'Misc',
-];
+function fmtR(n: number) { return 'R ' + n.toLocaleString('en-ZA'); }
 
 const CAT_COLORS: Record<PriceCategory, string> = {
   'Web Development':        '#3b82f6',
@@ -34,7 +31,6 @@ function VisibilityPicker({
 
   function toggleAssistant(id: string) {
     if (isAll) {
-      // Switch from 'all' to specific list minus this one
       onChange(assistants.filter(a => a.id !== id).map(a => a.id));
     } else {
       const arr = value as string[];
@@ -44,11 +40,7 @@ function VisibilityPicker({
 
   return (
     <div className="pl-visibility">
-      <button
-        type="button"
-        className={`pl-vis-all-btn ${isAll ? 'active' : ''}`}
-        onClick={() => onChange('all')}
-      >
+      <button type="button" className={`pl-vis-all-btn ${isAll ? 'active' : ''}`} onClick={() => onChange('all')}>
         <Users size={13} /> All Assistants
       </button>
       {assistants.length > 0 && (
@@ -56,12 +48,8 @@ function VisibilityPicker({
           {assistants.map(a => {
             const selected = isAll || (value as string[]).includes(a.id);
             return (
-              <button
-                key={a.id}
-                type="button"
-                className={`pl-vis-asst-btn ${selected ? 'active' : ''}`}
-                onClick={() => toggleAssistant(a.id)}
-              >
+              <button key={a.id} type="button" className={`pl-vis-asst-btn ${selected ? 'active' : ''}`}
+                onClick={() => toggleAssistant(a.id)}>
                 <span className={`pl-vis-dot ${selected ? 'on' : ''}`} />
                 {a.displayName || a.username}
               </button>
@@ -79,10 +67,10 @@ function ItemForm({
 }: {
   initial?: Partial<PriceListItem>;
   assistants: AppUser[];
-  onSave: (data: Omit<PriceListItem, 'id' | 'createdAt'>) => void;
+  onSave: (sku: string, name: string, category: PriceCategory, price: number, description: string, visibleTo: 'all' | string[]) => void;
   onCancel: () => void;
 }) {
-  const [productCode, setProductCode] = useState(initial?.productCode ?? '');
+  const [sku, setSku]                 = useState(initial?.sku ?? '');
   const [name, setName]               = useState(initial?.name ?? '');
   const [category, setCategory]       = useState<PriceCategory>(initial?.category ?? 'Web Development');
   const [price, setPrice]             = useState(String(initial?.price ?? ''));
@@ -93,29 +81,20 @@ function ItemForm({
 
   function submit() {
     if (!valid) return;
-    onSave({
-      productCode: productCode.trim(),
-      name: name.trim(),
-      category,
-      price: Number(price) || 0,
-      description: description.trim(),
-      visibleTo,
-    });
+    onSave(sku.trim(), name.trim(), category, Number(price) || 0, description.trim(), visibleTo);
   }
 
   return (
     <div className="pl-item-form">
       <div className="pl-form-grid">
         <div className="pl-form-field">
-          <label className="field-label">Product Code <span className="optional">(optional)</span></label>
-          <input className="field-input" placeholder="e.g. WD-001" value={productCode}
-            onChange={e => setProductCode(e.target.value)} />
+          <label className="field-label">SKU Code <span className="optional">(optional)</span></label>
+          <input className="field-input" placeholder="e.g. WD-001" value={sku} onChange={e => setSku(e.target.value)} />
         </div>
         <div className="pl-form-field">
           <label className="field-label">Service Name <span className="required">*</span></label>
           <input className="field-input" placeholder="e.g. 5-Page Business Website" value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submit()} autoFocus />
+            onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} autoFocus />
         </div>
         <div className="pl-form-field">
           <label className="field-label">Category</label>
@@ -127,8 +106,7 @@ function ItemForm({
           <label className="field-label">Price (R)</label>
           <div className="fin-input-wrap">
             <span>R</span>
-            <input type="number" className="fin-num" placeholder="0" value={price}
-              onChange={e => setPrice(e.target.value)} />
+            <input type="number" className="fin-num" placeholder="0" value={price} onChange={e => setPrice(e.target.value)} />
           </div>
         </div>
       </div>
@@ -180,7 +158,7 @@ function PriceItemCard({
           {CAT_ICONS[item.category]}
         </div>
         <div className="pl-item-info">
-          {item.productCode && <span className="pl-item-code">{item.productCode}</span>}
+          {item.sku && <span className="pl-item-code">{item.sku}</span>}
           <span className="pl-item-name">{item.name}</span>
           <span className="pl-item-cat" style={{ color, background: color + '18', borderColor: color + '44' }}>
             {item.category}
@@ -217,18 +195,18 @@ function PriceItemCard({
 }
 
 // ══════════════════════════════════════════════════════════════════
-// MAIN PRICE LIST COMPONENT
+// PRICING PAGE
 // ══════════════════════════════════════════════════════════════════
-export default function PriceList({
+export default function PricingPage({
   items, assistants, userId, mode,
   onAdd, onUpdate, onDelete,
 }: {
   items: PriceListItem[];
   assistants: AppUser[];
-  userId?: string;       // current user's ID — used to filter in assistant mode
+  userId?: string;
   mode: 'admin' | 'assistant';
-  onAdd?: (data: Omit<PriceListItem, 'id' | 'createdAt'>) => void;
-  onUpdate?: (id: string, data: Omit<PriceListItem, 'id' | 'createdAt'>) => void;
+  onAdd?: (sku: string, name: string, category: PriceCategory, price: number, description: string, visibleTo: 'all' | string[]) => void;
+  onUpdate?: (id: string, sku: string, name: string, category: PriceCategory, price: number, description: string, visibleTo: 'all' | string[]) => void;
   onDelete?: (id: string) => void;
 }) {
   const [activeCategory, setActiveCategory] = useState<PriceCategory | 'all'>('all');
@@ -237,142 +215,122 @@ export default function PriceList({
   const [editingId, setEditingId]           = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete]   = useState<string | null>(null);
 
-  // For assistant mode, filter by what's visible to this user
   const accessible = mode === 'assistant' && userId
     ? items.filter(i => i.visibleTo === 'all' || (i.visibleTo as string[]).includes(userId))
     : items;
 
-  // Apply category + search filters
   const filtered = accessible
     .filter(i => activeCategory === 'all' || i.category === activeCategory)
     .filter(i => {
       if (!search.trim()) return true;
       const q = search.toLowerCase();
       return i.name.toLowerCase().includes(q)
-        || i.productCode.toLowerCase().includes(q)
+        || i.sku.toLowerCase().includes(q)
         || i.description.toLowerCase().includes(q)
         || i.category.toLowerCase().includes(q);
     });
 
-  // Group by category for display
   const byCategory = PRICE_CATEGORIES.reduce<Record<string, PriceListItem[]>>((acc, cat) => {
     acc[cat] = filtered.filter(i => i.category === cat);
     return acc;
   }, {} as Record<string, PriceListItem[]>);
 
   return (
-    <div className="price-list">
-      {/* Header */}
-      <div className="section-head" style={{ marginBottom: 0 }}>
-        <Tag size={16} className="section-icon" />
-        <span>Price List</span>
-        <span className="section-total">{accessible.length} service{accessible.length !== 1 ? 's' : ''}</span>
+    <>
+      <div className="page-header">
+        <h1 className="page-title">Pricing</h1>
+        <span className="page-subtitle">{accessible.length} service{accessible.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      <main className="price-list">
         {mode === 'admin' && (
-          <button className="icon-btn accent" style={{ marginLeft: 'auto' }}
-            onClick={() => { setShowAddForm(p => !p); setEditingId(null); }}
-            title="Add service"
-          >
-            {showAddForm ? <X size={16} /> : <Plus size={16} />}
-          </button>
-        )}
-      </div>
-
-      {/* Add form */}
-      {mode === 'admin' && showAddForm && (
-        <div className="pl-add-wrap">
-          <ItemForm
-            assistants={assistants}
-            onSave={data => { onAdd?.(data); setShowAddForm(false); }}
-            onCancel={() => setShowAddForm(false)}
-          />
-        </div>
-      )}
-
-      {/* Search + category filter */}
-      <div className="pl-controls">
-        <div className="pl-search-wrap">
-          <Search size={14} className="pl-search-icon" />
-          <input
-            className="pl-search"
-            placeholder="Search services, codes, descriptions..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="icon-btn xs" onClick={() => setSearch('')}><X size={12} /></button>
-          )}
-        </div>
-        <div className="pl-cat-tabs">
-          <button
-            className={`pl-cat-tab ${activeCategory === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveCategory('all')}
-          >All</button>
-          {PRICE_CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              className={`pl-cat-tab ${activeCategory === cat ? 'active' : ''}`}
-              style={activeCategory === cat ? { background: CAT_COLORS[cat] + '22', color: CAT_COLORS[cat], borderColor: CAT_COLORS[cat] + '66' } : {}}
-              onClick={() => setActiveCategory(cat)}
-            >
-              {CAT_ICONS[cat]} {cat}
+          <div className="tasks-section-head">
+            <Tag size={16} className="section-icon" />
+            <span>Price List</span>
+            <button className="icon-btn accent" style={{ marginLeft: 'auto' }}
+              onClick={() => { setShowAddForm(p => !p); setEditingId(null); }} title="Add service">
+              {showAddForm ? <X size={16} /> : <Plus size={16} />}
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Items grouped by category */}
-      <div className="pl-items">
-        {filtered.length === 0 && (
-          <div className="assistant-empty" style={{ paddingTop: 40 }}>
-            <Tag size={36} style={{ opacity: 0.25, marginBottom: 12 }} />
-            <p className="assistant-empty-title">
-              {search ? 'No results for that search' : mode === 'admin' ? 'No services added yet' : 'No services available'}
-            </p>
-            {mode === 'admin' && !search && (
-              <p className="assistant-empty-sub">Click the + button above to add your first service.</p>
-            )}
           </div>
         )}
 
-        {PRICE_CATEGORIES.filter(cat => byCategory[cat]?.length > 0).map(cat => (
-          <div key={cat} className="pl-cat-group">
-            <div className="pl-cat-group-label" style={{ color: CAT_COLORS[cat], borderLeftColor: CAT_COLORS[cat] }}>
-              {CAT_ICONS[cat]} {cat}
-              <span className="pl-cat-count">{byCategory[cat].length}</span>
-            </div>
-            {byCategory[cat].map(item => (
-              editingId === item.id ? (
-                <div key={item.id} className="pl-add-wrap">
-                  <ItemForm
-                    initial={item}
-                    assistants={assistants}
-                    onSave={data => { onUpdate?.(item.id, data); setEditingId(null); }}
-                    onCancel={() => setEditingId(null)}
-                  />
-                </div>
-              ) : (
-                <div key={item.id}>
-                  {confirmDelete === item.id ? (
-                    <div className="pl-confirm-delete">
-                      <span>Delete "<strong>{item.name}</strong>"?</span>
-                      <button className="btn-danger" onClick={() => { onDelete?.(item.id); setConfirmDelete(null); }}>Delete</button>
-                      <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
-                    </div>
-                  ) : (
-                    <PriceItemCard
-                      item={item}
-                      assistants={assistants}
-                      mode={mode}
-                      onEdit={mode === 'admin' ? () => { setEditingId(item.id); setShowAddForm(false); } : undefined}
-                      onDelete={mode === 'admin' ? () => setConfirmDelete(item.id) : undefined}
-                    />
-                  )}
-                </div>
-              )
+        {mode === 'admin' && showAddForm && (
+          <div className="pl-add-wrap">
+            <ItemForm assistants={assistants}
+              onSave={(sku, name, category, price, description, visibleTo) => {
+                onAdd?.(sku, name, category, price, description, visibleTo); setShowAddForm(false);
+              }}
+              onCancel={() => setShowAddForm(false)} />
+          </div>
+        )}
+
+        <div className="pl-controls">
+          <div className="pl-search-wrap">
+            <Search size={14} className="pl-search-icon" />
+            <input className="pl-search" placeholder="Search services, SKUs, descriptions..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+            {search && <button className="icon-btn xs" onClick={() => setSearch('')}><X size={12} /></button>}
+          </div>
+          <div className="pl-cat-tabs">
+            <button className={`pl-cat-tab ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveCategory('all')}>All</button>
+            {PRICE_CATEGORIES.map(cat => (
+              <button key={cat} className={`pl-cat-tab ${activeCategory === cat ? 'active' : ''}`}
+                style={activeCategory === cat ? { background: CAT_COLORS[cat] + '22', color: CAT_COLORS[cat], borderColor: CAT_COLORS[cat] + '66' } : {}}
+                onClick={() => setActiveCategory(cat)}>
+                {CAT_ICONS[cat]} {cat}
+              </button>
             ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+
+        <div className="pl-items">
+          {filtered.length === 0 && (
+            <div className="empty-state">
+              <Tag size={36} />
+              <p className="assistant-empty-title">
+                {search ? 'No results for that search' : mode === 'admin' ? 'No services added yet' : 'No services available'}
+              </p>
+              {mode === 'admin' && !search && (
+                <p className="assistant-empty-sub">Click the + button above to add your first service.</p>
+              )}
+            </div>
+          )}
+
+          {PRICE_CATEGORIES.filter(cat => byCategory[cat]?.length > 0).map(cat => (
+            <div key={cat} className="pl-cat-group">
+              <div className="pl-cat-group-label" style={{ color: CAT_COLORS[cat], borderLeftColor: CAT_COLORS[cat] }}>
+                {CAT_ICONS[cat]} {cat}
+                <span className="pl-cat-count">{byCategory[cat].length}</span>
+              </div>
+              {byCategory[cat].map(item => (
+                editingId === item.id ? (
+                  <div key={item.id} className="pl-add-wrap">
+                    <ItemForm initial={item} assistants={assistants}
+                      onSave={(sku, name, category, price, description, visibleTo) => {
+                        onUpdate?.(item.id, sku, name, category, price, description, visibleTo); setEditingId(null);
+                      }}
+                      onCancel={() => setEditingId(null)} />
+                  </div>
+                ) : (
+                  <div key={item.id}>
+                    {confirmDelete === item.id ? (
+                      <div className="pl-confirm-delete">
+                        <span>Delete "<strong>{item.name}</strong>"?</span>
+                        <button className="btn-danger" onClick={() => { onDelete?.(item.id); setConfirmDelete(null); }}>Delete</button>
+                        <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <PriceItemCard item={item} assistants={assistants} mode={mode}
+                        onEdit={mode === 'admin' ? () => { setEditingId(item.id); setShowAddForm(false); } : undefined}
+                        onDelete={mode === 'admin' ? () => setConfirmDelete(item.id) : undefined} />
+                    )}
+                  </div>
+                )
+              ))}
+            </div>
+          ))}
+        </div>
+      </main>
+    </>
   );
 }
