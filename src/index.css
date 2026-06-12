@@ -323,6 +323,7 @@ body {
 }
 .btn-danger:hover { filter: brightness(1.1); }
 .btn-danger.sm { padding: 5px 12px; font-size: 0.825rem; }
+.btn-primary.sm { padding: 6px 14px; font-size: 0.825rem; }
 
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .inline-confirm { display: flex; align-items: center; gap: 6px; }
@@ -581,6 +582,58 @@ body {
   background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--r);
   font-size: 0.9rem; color: var(--text);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   RETAINER PAGE
+══════════════════════════════════════════════════════════════════ */
+.retainer-list { display: flex; flex-direction: column; gap: 14px; }
+.retainer-items { display: flex; flex-direction: column; gap: 10px; }
+
+.retainer-card {
+  background: var(--surface); border: 1px solid var(--border2); border-left: 3px solid;
+  border-radius: var(--r); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.retainer-card-main {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.retainer-card-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.retainer-card-name { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.retainer-card-desc { font-size: 0.825rem; color: var(--text3); line-height: 1.5; }
+
+.retainer-status {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  font-size: 0.75rem; font-weight: 700; border-radius: 99px; padding: 4px 10px; border: 1px solid;
+}
+.retainer-status.pending { color: var(--amber); border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.1); }
+.retainer-status.ok { color: var(--green); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.08); }
+
+.retainer-card-actions { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+
+/* ── Weekly check-in reminder modal ─────────────────────────────── */
+.retainer-reminder-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--overlay); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.retainer-reminder-modal {
+  background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r2);
+  box-shadow: var(--shadow); width: 100%; max-width: 480px;
+  padding: 22px; display: flex; flex-direction: column; gap: 14px;
+  max-height: 85vh; overflow-y: auto;
+}
+.retainer-reminder-head { display: flex; align-items: center; gap: 10px; color: var(--accent); }
+.retainer-reminder-head h2 { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+.retainer-reminder-sub { font-size: 0.85rem; color: var(--text3); line-height: 1.5; }
+.retainer-reminder-list { display: flex; flex-direction: column; gap: 8px; }
+.retainer-reminder-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r);
+  padding: 10px 12px;
+}
+.retainer-reminder-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.retainer-reminder-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.retainer-reminder-desc { font-size: 0.78rem; color: var(--text4); }
 
 /* ══════════════════════════════════════════════════════════════════
    SETTINGS PAGE

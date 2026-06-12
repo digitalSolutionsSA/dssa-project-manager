@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Project, ProjectTask, SubTask, PriceListItem, PriceCategory, CalendarEvent, ThemeMode } from './types';
+import { Project, ProjectTask, SubTask, PriceListItem, PriceCategory, CalendarEvent, RetainerClient, ThemeMode } from './types';
 import { getSupabaseClient } from './supabase';
 
 // ── Storage keys ──────────────────────────────────────────────────
@@ -8,6 +8,7 @@ const K = {
   standalone:  'pm_standaloneTasks',
   priceList:   'pm_priceList',
   calendar:    'pm_calendarEvents',
+  retainers:   'pm_retainerClients',
   theme:       'pm_theme',
 };
 
@@ -19,6 +20,23 @@ export const PRICE_CATEGORIES: PriceCategory[] = [
 // ── Helpers ───────────────────────────────────────────────────────
 export function genId(): string { return Math.random().toString(36).substring(2, 10); }
 export function todayStr(): string { return new Date().toISOString().split('T')[0]; }
+
+// ── Retainer week helpers ─────────────────────────────────────────
+// ISO 8601 week key, e.g. "2026-W24"
+export function getWeekKey(d: Date = new Date()): string {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7; // Mon = 0 ... Sun = 6
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const weekNum = 1 + Math.round(
+    ((date.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7
+  );
+  return `${date.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+export function needsCheckIn(client: RetainerClient): boolean {
+  if (!client.lastCheckIn) return true;
+  return getWeekKey(new Date(client.lastCheckIn)) !== getWeekKey(new Date());
+}
 
 // ── localStorage helpers ──────────────────────────────────────────
 function load<T>(key: string, def: T): T {
@@ -53,6 +71,7 @@ const DEFAULT_PROJECTS: Project[] = [];
 const DEFAULT_STANDALONE: ProjectTask[] = [];
 const DEFAULT_PRICELIST: PriceListItem[] = [];
 const DEFAULT_CALENDAR: CalendarEvent[] = [];
+const DEFAULT_RETAINERS: RetainerClient[] = [];
 
 // ══════════════════════════════════════════════════════════════════
 // MAIN STORE
@@ -62,6 +81,7 @@ export function useStore() {
   const [standaloneTasks, setStandalone]  = useState<ProjectTask[]>(() => load(K.standalone, DEFAULT_STANDALONE));
   const [priceList, setPriceList]         = useState<PriceListItem[]>(() => load(K.priceList, DEFAULT_PRICELIST));
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => load(K.calendar, DEFAULT_CALENDAR));
+  const [retainerClients, setRetainerClients] = useState<RetainerClient[]>(() => load(K.retainers, DEFAULT_RETAINERS));
   const [fbReady, setFbReady]             = useState(false);
   const [fbError, setFbError]             = useState<string | null>(null);
   const remoteUpdateKeys = useRef(new Set<string>());
@@ -80,6 +100,7 @@ export function useStore() {
   useEffect(() => { persistAndSync(K.standalone, 'standaloneTasks', standaloneTasks); }, [standaloneTasks, fbReady]);
   useEffect(() => { persistAndSync(K.priceList, 'priceList', priceList); }, [priceList, fbReady]);
   useEffect(() => { persistAndSync(K.calendar, 'calendarEvents', calendarEvents); }, [calendarEvents, fbReady]);
+  useEffect(() => { persistAndSync(K.retainers, 'retainerClients', retainerClients); }, [retainerClients, fbReady]);
 
   // ── Supabase realtime listener ────────────────────────────────
   useEffect(() => {
@@ -89,6 +110,7 @@ export function useStore() {
       standaloneTasks: (v) => setStandalone(v as ProjectTask[]),
       priceList: (v) => setPriceList(v as PriceListItem[]),
       calendarEvents: (v) => setCalendarEvents(v as CalendarEvent[]),
+      retainerClients: (v) => setRetainerClients(v as RetainerClient[]),
     };
 
     function applyRow(key: string, value: unknown) {
@@ -187,6 +209,15 @@ export function useStore() {
     setCalendarEvents(p => p.map(e => e.id === id ? { ...e, ...changes } : e));
   const deleteCalendarEvent = (id: string) => setCalendarEvents(p => p.filter(e => e.id !== id));
 
+  // ── RETAINER CLIENTS ──────────────────────────────────────────────
+  const addRetainerClient = (name: string, description: string = '') =>
+    setRetainerClients(p => [...p, { id: genId(), name, description, createdAt: new Date().toISOString() }]);
+  const updateRetainerClient = (id: string, changes: Partial<RetainerClient>) =>
+    setRetainerClients(p => p.map(c => c.id === id ? { ...c, ...changes } : c));
+  const deleteRetainerClient = (id: string) => setRetainerClients(p => p.filter(c => c.id !== id));
+  const checkInRetainerClient = (id: string) =>
+    setRetainerClients(p => p.map(c => c.id === id ? { ...c, lastCheckIn: new Date().toISOString() } : c));
+
   return {
     fbReady, fbError,
     projects, addProject, deleteProject, updateProject, archiveProject, unarchiveProject,
@@ -196,6 +227,7 @@ export function useStore() {
     addStandaloneSubTask, toggleStandaloneSubTask, deleteStandaloneSubTask,
     priceList, addPriceItem, deletePriceItem, updatePriceItem,
     calendarEvents, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
+    retainerClients, addRetainerClient, updateRetainerClient, deleteRetainerClient, checkInRetainerClient,
   };
 }
 

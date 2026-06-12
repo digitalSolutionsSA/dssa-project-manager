@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Plus, Trash2, KeyRound, Users, Check, X, ShieldCheck, UserCog,
-  Tag, ClipboardList, Sun, Moon, Wifi, WifiOff, Settings as SettingsIcon, Calendar,
+  Tag, ClipboardList, Sun, Moon, Wifi, WifiOff, Settings as SettingsIcon, Calendar, Repeat,
 } from 'lucide-react';
 import { AppUser, UserRole, ThemeMode } from './types';
 
@@ -15,7 +15,7 @@ interface Props {
   onAddUser: (username: string, pin: string, role: UserRole, displayName: string) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
   onChangePin: (id: string, newPin: string) => Promise<void>;
-  onUpdatePermissions: (id: string, perms: { tasksAccess?: boolean; pricesAccess?: boolean; calendarAccess?: boolean }) => Promise<void>;
+  onUpdatePermissions: (id: string, perms: { tasksAccess?: boolean; pricesAccess?: boolean; calendarAccess?: boolean; retainerAccess?: boolean }) => Promise<void>;
 }
 
 export default function SettingsPage({
@@ -190,6 +190,14 @@ export default function SettingsPage({
                     >
                       <Calendar size={12} />
                       <span>Calendar</span>
+                    </button>
+                    <button
+                      className={`perm-toggle-btn ${u.retainerAccess ? 'on' : ''}`}
+                      onClick={() => onUpdatePermissions(u.id, { retainerAccess: !u.retainerAccess })}
+                      title={u.retainerAccess ? 'Revoke retainer access' : 'Grant retainer access'}
+                    >
+                      <Repeat size={12} />
+                      <span>Retainer</span>
                     </button>
                   </div>
                 )}

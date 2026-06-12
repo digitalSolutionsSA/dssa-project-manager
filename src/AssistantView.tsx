@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import {
   LogOut, ClipboardList, Tag, Check, ChevronDown, ChevronRight,
-  CornerDownRight, CheckCircle2, Sun, Moon, FolderKanban, Calendar,
+  CornerDownRight, CheckCircle2, Sun, Moon, FolderKanban, Calendar, Repeat,
 } from 'lucide-react';
-import { AppUser, Project, ProjectTask, PriceListItem, CalendarEvent, ThemeMode } from './types';
+import { AppUser, Project, ProjectTask, PriceListItem, CalendarEvent, RetainerClient, ThemeMode } from './types';
 import PricingPage from './PricingPage';
 import CalendarPage from './CalendarPage';
+import RetainerPage from './RetainerPage';
+import RetainerReminder from './RetainerReminder';
+import { needsCheckIn } from './useStore';
 
 interface TaskEntry {
   task: ProjectTask;
@@ -20,6 +23,8 @@ interface Props {
   priceList: PriceListItem[];
   allAssistants: AppUser[];
   calendarEvents: CalendarEvent[];
+  retainerClients: RetainerClient[];
+  onCheckInRetainer: (id: string) => void;
   onLogout: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
@@ -32,7 +37,7 @@ interface Props {
   onDeleteCalendarEvent: (id: string) => void;
 }
 
-type Tab = 'tasks' | 'calendar' | 'prices';
+type Tab = 'tasks' | 'calendar' | 'prices' | 'retainer';
 
 // ── My Task Card ────────────────────────────────────────────────────
 function MyTaskCard({ entry, onToggle, onToggleSub }: {
@@ -86,7 +91,8 @@ function MyTaskCard({ entry, onToggle, onToggleSub }: {
 // ASSISTANT VIEW
 // ══════════════════════════════════════════════════════════════════
 export default function AssistantView({
-  currentUser, projects, standaloneTasks, priceList, allAssistants, calendarEvents, onLogout,
+  currentUser, projects, standaloneTasks, priceList, allAssistants, calendarEvents,
+  retainerClients, onCheckInRetainer, onLogout,
   theme, onToggleTheme,
   onToggleProjectTask, onToggleProjectSub, onToggleStandaloneTask, onToggleStandaloneSub,
   onAddCalendarEvent, onUpdateCalendarEvent, onDeleteCalendarEvent,
@@ -94,9 +100,11 @@ export default function AssistantView({
   const hasTasks    = currentUser.tasksAccess !== false;
   const hasPrices   = !!currentUser.pricesAccess;
   const hasCalendar = currentUser.calendarAccess !== false;
+  const hasRetainer = !!currentUser.retainerAccess;
   const myPrices = hasPrices
     ? priceList.filter(i => i.visibleTo === 'all' || (i.visibleTo as string[]).includes(currentUser.id))
     : [];
+  const pendingRetainers = hasRetainer ? retainerClients.filter(needsCheckIn) : [];
 
   const defaultTab: Tab = hasTasks ? 'tasks' : 'prices';
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
@@ -129,6 +137,8 @@ export default function AssistantView({
         <div className="glow g1" /><div className="glow g2" /><div className="glow g3" />
         <div className="grid-overlay" />
       </div>
+
+      <RetainerReminder clients={pendingRetainers} onCheckIn={onCheckInRetainer} />
 
       {/* Header */}
       <header className="app-header">
@@ -167,6 +177,12 @@ export default function AssistantView({
           <button className={`tab-btn ${activeTab === 'prices' ? 'active' : ''}`} onClick={() => setActiveTab('prices')}>
             <Tag size={15} /><span className="tab-label"> Price List</span>
             {myPrices.length > 0 && <span className="tab-count">{myPrices.length}</span>}
+          </button>
+        )}
+        {hasRetainer && (
+          <button className={`tab-btn ${activeTab === 'retainer' ? 'active' : ''}`} onClick={() => setActiveTab('retainer')}>
+            <Repeat size={15} /><span className="tab-label"> Retainer</span>
+            {pendingRetainers.length > 0 && <span className="tab-count">{pendingRetainers.length}</span>}
           </button>
         )}
       </div>
@@ -222,6 +238,17 @@ export default function AssistantView({
           userId={currentUser.id}
           mode="assistant"
         />
+      )}
+
+      {/* ── RETAINER TAB ──────────────────────────────────────────── */}
+      {activeTab === 'retainer' && hasRetainer && (
+        <main className="assistant-board">
+          <RetainerPage
+            clients={retainerClients}
+            mode="assistant"
+            onCheckIn={onCheckInRetainer}
+          />
+        </main>
       )}
     </div>
   );

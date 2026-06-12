@@ -8,6 +8,9 @@ import TasksPage from './TasksPage';
 import PricingPage from './PricingPage';
 import SettingsPage from './SettingsPage';
 import CalendarPage from './CalendarPage';
+import RetainerPage from './RetainerPage';
+import RetainerReminder from './RetainerReminder';
+import { needsCheckIn } from './useStore';
 import { AppUser } from './types';
 
 // ══════════════════════════════════════════════════════════════════
@@ -23,6 +26,7 @@ function AdminApp({ store, auth, theme, onToggleTheme }: {
   const { currentUser, users } = auth;
   const assistants = users.filter(u => u.role === 'assistant');
   const assignableUsers = users.map(u => u.id === currentUser?.id ? { ...u, displayName: 'Me' } : u);
+  const pendingRetainers = store.retainerClients.filter(needsCheckIn);
 
   return (
     <div className="app">
@@ -30,6 +34,8 @@ function AdminApp({ store, auth, theme, onToggleTheme }: {
         <div className="glow g1" /><div className="glow g2" /><div className="glow g3" />
         <div className="grid-overlay" />
       </div>
+
+      <RetainerReminder clients={pendingRetainers} onCheckIn={store.checkInRetainerClient} />
 
       <Sidebar
         activePage={activePage}
@@ -93,6 +99,17 @@ function AdminApp({ store, auth, theme, onToggleTheme }: {
           />
         )}
 
+        {activePage === 'retainer' && (
+          <RetainerPage
+            clients={store.retainerClients}
+            mode="admin"
+            onAdd={store.addRetainerClient}
+            onUpdate={store.updateRetainerClient}
+            onDelete={store.deleteRetainerClient}
+            onCheckIn={store.checkInRetainerClient}
+          />
+        )}
+
         {activePage === 'settings' && currentUser && (
           <SettingsPage
             users={users}
@@ -152,6 +169,8 @@ export default function App() {
       priceList={store.priceList}
       allAssistants={assistants}
       calendarEvents={store.calendarEvents}
+      retainerClients={store.retainerClients}
+      onCheckInRetainer={store.checkInRetainerClient}
       onLogout={auth.logout}
       theme={theme}
       onToggleTheme={toggleTheme}

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  ClipboardList, Tag, Settings, Sun, Moon, LogOut, Wifi, WifiOff, Calendar,
+  ClipboardList, Tag, Settings, Sun, Moon, LogOut, Wifi, WifiOff, Calendar, Repeat,
 } from 'lucide-react';
 import { ThemeMode } from './types';
 
-export type NavPage = 'tasks' | 'calendar' | 'pricing' | 'settings';
+export type NavPage = 'tasks' | 'calendar' | 'pricing' | 'retainer' | 'settings';
 
 interface NavItem {
   id: NavPage;
@@ -40,6 +40,7 @@ export default function Sidebar({ activePage, onNavigate, displayName, onLogout,
     { id: 'tasks',    label: 'Tasks',    icon: <ClipboardList size={18} /> },
     { id: 'calendar', label: 'Calendar', icon: <Calendar size={18} /> },
     { id: 'pricing',  label: 'Pricing',  icon: <Tag size={18} /> },
+    { id: 'retainer', label: 'Retainer', icon: <Repeat size={18} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
   ];
 

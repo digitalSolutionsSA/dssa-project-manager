@@ -11,6 +11,7 @@ export interface AppUser {
   tasksAccess?: boolean;    // default true for assistants
   pricesAccess?: boolean;   // default false — explicit opt-in
   calendarAccess?: boolean; // default true for assistants
+  retainerAccess?: boolean; // default false — explicit opt-in
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────
@@ -63,6 +64,15 @@ export interface CalendarEvent {
   time?: string;         // HH:MM
   description?: string;
   createdBy?: string;    // user id who added it
+  createdAt: string;
+}
+
+// ── Retainer Clients ──────────────────────────────────────────────
+export interface RetainerClient {
+  id: string;
+  name: string;
+  description?: string;
+  lastCheckIn?: string;  // ISO timestamp of last weekly check-in
   createdAt: string;
 }
 
