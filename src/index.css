@@ -891,19 +891,125 @@ body {
   .user-add-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* ── MOBILE (≤768px) ────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  /* Layout */
   .sidebar { display: none; }
   .bottom-nav { display: flex; }
-  .page-content { margin-left: 0; padding: 20px 16px 90px; }
+  .page-content { margin-left: 0; padding: 16px 12px 96px; }
+
+  /* Forms */
   .pl-form-grid { grid-template-columns: 1fr; }
   .user-add-grid { grid-template-columns: 1fr; }
+
+  /* Prevent iOS auto-zoom on focus (inputs must be ≥16px) */
+  .field-input,
+  .field-select,
+  .fin-num,
+  .pl-search { font-size: 16px; }
+
+  /* Bottom nav — bigger tap targets */
+  .bottom-nav {
+    padding: 4px 4px max(env(safe-area-inset-bottom), 8px);
+  }
+  .bottom-nav-item {
+    padding: 8px 10px 6px;
+    min-width: 44px;
+    min-height: 52px;
+    font-size: 0.65rem;
+  }
+
+  /* ── CRITICAL: Task buttons are opacity:0 / hover-only on desktop.
+        On mobile there is no hover — make them always visible. ── */
+  .task-item-row .icon-btn { opacity: 1; }
+  .subtask-row .icon-btn   { opacity: 1; }
+  .task-assign-select      { opacity: 1; }
+
+  /* ── Larger touch targets for task controls ── */
+  .icon-btn     { width: 40px; height: 40px; }
+  .icon-btn.xs  { width: 36px; height: 36px; }
+  .task-check   { width: 26px; height: 26px; border-radius: 8px; }
+  .task-check.sm { width: 22px; height: 22px; }
+
+  /* ── Task row: wrap on small screens so nothing gets clipped ── */
+  .task-item-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 4px;
+  }
+  .task-item-title { min-width: 60%; }
+
+  /* ── Add-task form: stack on mobile ── */
+  .add-task-form {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .add-task-form .field-input.flex1 { min-width: 100%; }
+  .add-task-form .task-due-input    { flex: 1; max-width: none; min-width: 0; }
+  .add-task-form .task-assign-select { flex: 1; min-width: 0; max-width: none; }
+
+  /* ── Subtask indentation reduced ── */
+  .subtask-list  { padding-left: 16px; }
+  .btn-add-sub   { margin-left: 16px; }
+
+  /* ── Project header wrap ── */
   .project-header { flex-wrap: wrap; }
+  .project-header-actions { flex-wrap: wrap; }
+
+  /* ── Settings rows: stack label + control vertically ── */
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .user-row { flex-wrap: wrap; }
+  .user-perms { margin-left: 0; }
+
+  /* ── Retainer modal: fit small screens ── */
+  .retainer-reminder-modal { max-width: 95vw; padding: 16px; }
+
+  /* ── Calendar: single column below 768px ── */
+  .calendar-page { grid-template-columns: 1fr; }
+  .cal-day { font-size: 0.875rem; }
+
+  /* ── Assistant view ── */
+  .assistant-app { padding: 0 12px 96px; }
+  .tab-btn { font-size: 0.8125rem; padding: 10px 8px; gap: 5px; }
 }
 
-@media (max-width: 560px) {
-  .page-title { font-size: 1.4rem; }
-  .app-header { flex-wrap: wrap; gap: 12px; }
-  .header-title-block { padding-left: 16px; margin-left: 16px; }
+/* ── SMALL PHONES (≤480px) ─────────────────────────────────────── */
+@media (max-width: 480px) {
+  .page-title   { font-size: 1.3rem; }
+  .page-content { padding: 12px 10px 96px; }
+
+  .app-header { flex-wrap: wrap; gap: 10px; }
+  .header-title-block { padding-left: 14px; margin-left: 14px; }
   .btn-logout-label { display: none; }
+
   .pl-item-info { gap: 6px; }
+  .pl-item-price { font-size: 0.9rem; }
+
+  /* Calendar day cells: slightly taller for easy tap */
+  .cal-day { min-height: 40px; aspect-ratio: unset; padding: 6px 2px; }
+
+  /* Tab nav: shrink icon labels */
+  .tab-btn { padding: 8px 6px; font-size: 0.75rem; }
+  .tab-count { display: none; }
+
+  /* Retainer reminder list items: stack */
+  .retainer-reminder-item { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── TOUCH :active feedback (replaces hover on mobile) ── */
+@media (hover: none) {
+  .icon-btn:active     { background: var(--surface3); color: var(--text); }
+  .icon-btn.red-h:active { background: rgba(239,68,68,0.1); color: var(--red); border-color: rgba(239,68,68,0.3); }
+  .btn-primary:active  { background: var(--accent3); }
+  .btn-ghost:active    { background: var(--surface2); }
+  .btn-danger:active   { filter: brightness(1.1); }
+  .bottom-nav-item:active { color: var(--accent); }
+  .sb-nav-item:active  { background: var(--surface2); color: var(--text); }
+  .task-due-badge:active { border-color: var(--accent); color: var(--text); }
+  .cal-day:active      { border-color: var(--accent); color: var(--accent); }
+  .pl-cat-tab:active   { color: var(--accent); border-color: rgba(59,130,246,0.5); }
 }
