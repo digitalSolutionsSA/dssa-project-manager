@@ -26,7 +26,11 @@ function AdminApp({ store, auth, theme, onToggleTheme }: {
   const { currentUser, users } = auth;
   const assistants = users.filter(u => u.role === 'assistant');
   const assignableUsers = users.map(u => u.id === currentUser?.id ? { ...u, displayName: 'Me' } : u);
-  const pendingRetainers = store.retainerClients.filter(needsCheckIn);
+  const adminId = currentUser?.id ?? '';
+  function isAssigned(assignedTo: string | undefined) {
+    return !assignedTo || assignedTo === 'all' || assignedTo === adminId;
+  }
+  const pendingRetainers = store.retainerClients.filter(c => needsCheckIn(c) && isAssigned(c.assignedTo));
 
   return (
     <div className="app">
@@ -85,6 +89,7 @@ function AdminApp({ store, auth, theme, onToggleTheme }: {
             onAddEvent={store.addCalendarEvent}
             onUpdateEvent={store.updateCalendarEvent}
             onDeleteEvent={store.deleteCalendarEvent}
+            postSchedules={store.postSchedules.filter(s => isAssigned(s.assignedTo))}
           />
         )}
 
@@ -103,10 +108,20 @@ function AdminApp({ store, auth, theme, onToggleTheme }: {
           <RetainerPage
             clients={store.retainerClients}
             mode="admin"
+            users={users}
             onAdd={store.addRetainerClient}
             onUpdate={store.updateRetainerClient}
             onDelete={store.deleteRetainerClient}
             onCheckIn={store.checkInRetainerClient}
+            postSchedules={store.postSchedules}
+            onAddSchedule={store.addPostSchedule}
+            onUpdateSchedule={store.updatePostSchedule}
+            onDeleteSchedule={store.deletePostSchedule}
+            checkInReminders={store.checkInReminders}
+            onAddReminder={store.addCheckInReminder}
+            onToggleReminder={store.toggleCheckInReminder}
+            onUpdateReminder={store.updateCheckInReminder}
+            onDeleteReminder={store.deleteCheckInReminder}
           />
         )}
 
@@ -181,6 +196,8 @@ export default function App() {
       onAddCalendarEvent={store.addCalendarEvent}
       onUpdateCalendarEvent={store.updateCalendarEvent}
       onDeleteCalendarEvent={store.deleteCalendarEvent}
+      postSchedules={store.postSchedules}
+      checkInReminders={store.checkInReminders}
     />
   );
 }

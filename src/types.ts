@@ -73,6 +73,30 @@ export interface RetainerClient {
   name: string;
   description?: string;
   lastCheckIn?: string;  // ISO timestamp of last weekly check-in
+  assignedTo?: 'all' | string;  // user id or 'all'; defaults to 'all'
+  createdAt: string;
+}
+
+// ── Post Schedules ────────────────────────────────────────────────
+export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+
+export interface PostSchedule {
+  id: string;
+  clientId: string;
+  clientName: string;
+  days: DayOfWeek[];
+  assignedTo: 'all' | string;
+  createdAt: string;
+}
+
+// ── Check-in Reminders ────────────────────────────────────────────
+export interface CheckInReminder {
+  id: string;
+  title: string;
+  message?: string;
+  active: boolean;
+  schedule: 'daily' | DayOfWeek;
+  assignedTo: 'all' | string;
   createdAt: string;
 }
 

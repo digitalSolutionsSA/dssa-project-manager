@@ -3,11 +3,12 @@ import {
   LogOut, ClipboardList, Tag, Check, ChevronDown, ChevronRight,
   CornerDownRight, CheckCircle2, Sun, Moon, FolderKanban, Calendar, Repeat,
 } from 'lucide-react';
-import { AppUser, Project, ProjectTask, PriceListItem, CalendarEvent, RetainerClient, ThemeMode } from './types';
+import { AppUser, Project, ProjectTask, PriceListItem, CalendarEvent, RetainerClient, PostSchedule, CheckInReminder, ThemeMode } from './types';
 import PricingPage from './PricingPage';
 import CalendarPage from './CalendarPage';
 import RetainerPage from './RetainerPage';
 import RetainerReminder from './RetainerReminder';
+import CheckInReminderOverlay from './CheckInReminderOverlay';
 import { needsCheckIn } from './useStore';
 
 interface TaskEntry {
@@ -35,6 +36,8 @@ interface Props {
   onAddCalendarEvent: (title: string, date: string, time?: string, description?: string, createdBy?: string) => void;
   onUpdateCalendarEvent: (id: string, changes: Partial<CalendarEvent>) => void;
   onDeleteCalendarEvent: (id: string) => void;
+  postSchedules?: PostSchedule[];
+  checkInReminders?: CheckInReminder[];
 }
 
 type Tab = 'tasks' | 'calendar' | 'prices' | 'retainer';
@@ -96,6 +99,7 @@ export default function AssistantView({
   theme, onToggleTheme,
   onToggleProjectTask, onToggleProjectSub, onToggleStandaloneTask, onToggleStandaloneSub,
   onAddCalendarEvent, onUpdateCalendarEvent, onDeleteCalendarEvent,
+  postSchedules = [], checkInReminders = [],
 }: Props) {
   const hasTasks    = currentUser.tasksAccess !== false;
   const hasPrices   = !!currentUser.pricesAccess;
@@ -104,7 +108,14 @@ export default function AssistantView({
   const myPrices = hasPrices
     ? priceList.filter(i => i.visibleTo === 'all' || (i.visibleTo as string[]).includes(currentUser.id))
     : [];
-  const pendingRetainers = hasRetainer ? retainerClients.filter(needsCheckIn) : [];
+  function isAssignedToMe(assignedTo: string | undefined) {
+    return !assignedTo || assignedTo === 'all' || assignedTo === currentUser.id;
+  }
+  const pendingRetainers = hasRetainer
+    ? retainerClients.filter(c => needsCheckIn(c) && isAssignedToMe(c.assignedTo))
+    : [];
+  const mySchedules = postSchedules.filter(s => isAssignedToMe(s.assignedTo));
+  const myReminders = checkInReminders.filter(r => isAssignedToMe(r.assignedTo));
 
   const defaultTab: Tab = hasTasks ? 'tasks' : 'prices';
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
@@ -139,6 +150,7 @@ export default function AssistantView({
       </div>
 
       <RetainerReminder clients={pendingRetainers} onCheckIn={onCheckInRetainer} />
+      <CheckInReminderOverlay reminders={myReminders} />
 
       {/* Header */}
       <header className="app-header">
@@ -225,6 +237,7 @@ export default function AssistantView({
             onAddEvent={onAddCalendarEvent}
             onUpdateEvent={onUpdateCalendarEvent}
             onDeleteEvent={onDeleteCalendarEvent}
+            postSchedules={mySchedules}
             embedded
           />
         </main>

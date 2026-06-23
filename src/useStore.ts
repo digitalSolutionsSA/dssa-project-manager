@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Project, ProjectTask, SubTask, PriceListItem, PriceCategory, CalendarEvent, RetainerClient, ThemeMode } from './types';
+import { Project, ProjectTask, SubTask, PriceListItem, PriceCategory, CalendarEvent, RetainerClient, PostSchedule, CheckInReminder, DayOfWeek, ThemeMode } from './types';
 import { getSupabaseClient } from './supabase';
 
 // ── Storage keys ──────────────────────────────────────────────────
@@ -9,6 +9,8 @@ const K = {
   priceList:   'pm_priceList',
   calendar:    'pm_calendarEvents',
   retainers:   'pm_retainerClients',
+  schedules:   'pm_postSchedules',
+  reminders:   'pm_checkInReminders',
   theme:       'pm_theme',
 };
 
@@ -72,6 +74,8 @@ const DEFAULT_STANDALONE: ProjectTask[] = [];
 const DEFAULT_PRICELIST: PriceListItem[] = [];
 const DEFAULT_CALENDAR: CalendarEvent[] = [];
 const DEFAULT_RETAINERS: RetainerClient[] = [];
+const DEFAULT_SCHEDULES: PostSchedule[] = [];
+const DEFAULT_REMINDERS: CheckInReminder[] = [];
 
 // ══════════════════════════════════════════════════════════════════
 // MAIN STORE
@@ -82,6 +86,8 @@ export function useStore() {
   const [priceList, setPriceList]         = useState<PriceListItem[]>(() => load(K.priceList, DEFAULT_PRICELIST));
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => load(K.calendar, DEFAULT_CALENDAR));
   const [retainerClients, setRetainerClients] = useState<RetainerClient[]>(() => load(K.retainers, DEFAULT_RETAINERS));
+  const [postSchedules, setPostSchedules] = useState<PostSchedule[]>(() => load(K.schedules, DEFAULT_SCHEDULES));
+  const [checkInReminders, setCheckInReminders] = useState<CheckInReminder[]>(() => load(K.reminders, DEFAULT_REMINDERS));
   const [fbReady, setFbReady]             = useState(false);
   const [fbError, setFbError]             = useState<string | null>(null);
   const remoteUpdateKeys = useRef(new Set<string>());
@@ -101,6 +107,8 @@ export function useStore() {
   useEffect(() => { persistAndSync(K.priceList, 'priceList', priceList); }, [priceList, fbReady]);
   useEffect(() => { persistAndSync(K.calendar, 'calendarEvents', calendarEvents); }, [calendarEvents, fbReady]);
   useEffect(() => { persistAndSync(K.retainers, 'retainerClients', retainerClients); }, [retainerClients, fbReady]);
+  useEffect(() => { persistAndSync(K.schedules, 'postSchedules', postSchedules); }, [postSchedules, fbReady]);
+  useEffect(() => { persistAndSync(K.reminders, 'checkInReminders', checkInReminders); }, [checkInReminders, fbReady]);
 
   // ── Supabase realtime listener ────────────────────────────────
   useEffect(() => {
@@ -111,6 +119,8 @@ export function useStore() {
       priceList: (v) => setPriceList(v as PriceListItem[]),
       calendarEvents: (v) => setCalendarEvents(v as CalendarEvent[]),
       retainerClients: (v) => setRetainerClients(v as RetainerClient[]),
+      postSchedules: (v) => setPostSchedules(v as PostSchedule[]),
+      checkInReminders: (v) => setCheckInReminders(v as CheckInReminder[]),
     };
 
     function applyRow(key: string, value: unknown) {
@@ -210,13 +220,29 @@ export function useStore() {
   const deleteCalendarEvent = (id: string) => setCalendarEvents(p => p.filter(e => e.id !== id));
 
   // ── RETAINER CLIENTS ──────────────────────────────────────────────
-  const addRetainerClient = (name: string, description: string = '') =>
-    setRetainerClients(p => [...p, { id: genId(), name, description, createdAt: new Date().toISOString() }]);
+  const addRetainerClient = (name: string, description: string = '', assignedTo: string = 'all') =>
+    setRetainerClients(p => [...p, { id: genId(), name, description, assignedTo, createdAt: new Date().toISOString() }]);
   const updateRetainerClient = (id: string, changes: Partial<RetainerClient>) =>
     setRetainerClients(p => p.map(c => c.id === id ? { ...c, ...changes } : c));
   const deleteRetainerClient = (id: string) => setRetainerClients(p => p.filter(c => c.id !== id));
   const checkInRetainerClient = (id: string) =>
     setRetainerClients(p => p.map(c => c.id === id ? { ...c, lastCheckIn: new Date().toISOString() } : c));
+
+  // ── POST SCHEDULES ────────────────────────────────────────────────
+  const addPostSchedule = (clientId: string, clientName: string, days: DayOfWeek[], assignedTo: string = 'all') =>
+    setPostSchedules(p => [...p, { id: genId(), clientId, clientName, days, assignedTo, createdAt: new Date().toISOString() }]);
+  const updatePostSchedule = (id: string, days: DayOfWeek[], clientName?: string, assignedTo?: string) =>
+    setPostSchedules(p => p.map(s => s.id === id ? { ...s, days, ...(clientName ? { clientName } : {}), ...(assignedTo !== undefined ? { assignedTo } : {}) } : s));
+  const deletePostSchedule = (id: string) => setPostSchedules(p => p.filter(s => s.id !== id));
+
+  // ── CHECK-IN REMINDERS ────────────────────────────────────────────
+  const addCheckInReminder = (title: string, message?: string, schedule: import('./types').CheckInReminder['schedule'] = 'daily', assignedTo: string = 'all') =>
+    setCheckInReminders(p => [...p, { id: genId(), title, message, active: false, schedule, assignedTo, createdAt: new Date().toISOString() }]);
+  const toggleCheckInReminder = (id: string) =>
+    setCheckInReminders(p => p.map(r => r.id === id ? { ...r, active: !r.active } : r));
+  const updateCheckInReminder = (id: string, changes: Partial<CheckInReminder>) =>
+    setCheckInReminders(p => p.map(r => r.id === id ? { ...r, ...changes } : r));
+  const deleteCheckInReminder = (id: string) => setCheckInReminders(p => p.filter(r => r.id !== id));
 
   return {
     fbReady, fbError,
@@ -228,6 +254,8 @@ export function useStore() {
     priceList, addPriceItem, deletePriceItem, updatePriceItem,
     calendarEvents, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
     retainerClients, addRetainerClient, updateRetainerClient, deleteRetainerClient, checkInRetainerClient,
+    postSchedules, addPostSchedule, updatePostSchedule, deletePostSchedule,
+    checkInReminders, addCheckInReminder, toggleCheckInReminder, updateCheckInReminder, deleteCheckInReminder,
   };
 }
 

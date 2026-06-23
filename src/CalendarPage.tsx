@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Check, X, Clock, CalendarDays, Edit3 } from 'lucide-react';
-import { AppUser, CalendarEvent } from './types';
+import { AppUser, CalendarEvent, PostSchedule, DayOfWeek } from './types';
 import { todayStr } from './useStore';
+
+const DOW_INDEX: Record<DayOfWeek, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const SCHEDULE_COLOURS = [
+  '#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316',
+];
 
 interface Props {
   events: CalendarEvent[];
@@ -10,6 +15,7 @@ interface Props {
   onUpdateEvent: (id: string, changes: Partial<CalendarEvent>) => void;
   onDeleteEvent: (id: string) => void;
   embedded?: boolean;
+  postSchedules?: PostSchedule[];
 }
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -19,7 +25,7 @@ function dateKey(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export default function CalendarPage({ events, currentUser, onAddEvent, onUpdateEvent, onDeleteEvent, embedded }: Props) {
+export default function CalendarPage({ events, currentUser, onAddEvent, onUpdateEvent, onDeleteEvent, embedded, postSchedules = [] }: Props) {
   const today = new Date();
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -69,6 +75,14 @@ export default function CalendarPage({ events, currentUser, onAddEvent, onUpdate
 
   const selectedEvents = (eventsByDate.get(selected) || []).slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
+  function schedulesForDate(dateStr: string): PostSchedule[] {
+    const dow = new Date(dateStr + 'T00:00:00').getDay() as 0|1|2|3|4|5|6;
+    const dayName = (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as DayOfWeek[])[dow];
+    return postSchedules.filter(s => s.days.includes(dayName));
+  }
+
+  const selectedSchedules = schedulesForDate(selected);
+
   const resetForm = () => { setTitle(''); setTime(''); setDesc(''); setShowAdd(false); setEditingId(null); };
 
   const submit = () => {
@@ -114,13 +128,25 @@ export default function CalendarPage({ events, currentUser, onAddEvent, onUpdate
           <div className="cal-grid">
             {cells.map(c => {
               const dayEvents = eventsByDate.get(c.date) || [];
+              const daySched = schedulesForDate(c.date);
               return (
                 <button
                   key={c.date}
-                  className={`cal-day ${c.inMonth ? '' : 'outside'} ${c.date === todayStr() ? 'today' : ''} ${c.date === selected ? 'selected' : ''} ${dayEvents.length > 0 ? 'has-events' : ''}`}
+                  className={`cal-day ${c.inMonth ? '' : 'outside'} ${c.date === todayStr() ? 'today' : ''} ${c.date === selected ? 'selected' : ''} ${dayEvents.length > 0 || daySched.length > 0 ? 'has-events' : ''}`}
                   onClick={() => setSelected(c.date)}
                 >
                   <span className="cal-day-num">{c.day}</span>
+                  {daySched.length > 0 && c.inMonth && (
+                    <span className="cal-sched-tags">
+                      {daySched.slice(0, 2).map((s, i) => (
+                        <span key={s.id} className="cal-sched-tag"
+                          style={{ background: SCHEDULE_COLOURS[i % SCHEDULE_COLOURS.length] }}>
+                          {s.clientName.split(' ')[0]}
+                        </span>
+                      ))}
+                      {daySched.length > 2 && <span className="cal-sched-tag" style={{ background: 'var(--text4)' }}>+{daySched.length - 2}</span>}
+                    </span>
+                  )}
                   {dayEvents.length > 0 && (
                     <span className="cal-dots">
                       {dayEvents.slice(0, 3).map(e => <span key={e.id} className="cal-dot" aria-hidden="true" />)}
@@ -159,7 +185,19 @@ export default function CalendarPage({ events, currentUser, onAddEvent, onUpdate
             </div>
           )}
 
-          {selectedEvents.length === 0 && !showAdd && (
+          {selectedSchedules.length > 0 && (
+            <div className="cal-sched-section">
+              <span className="cal-sched-section-label">Scheduled Posts</span>
+              {selectedSchedules.map((s, i) => (
+                <div key={s.id} className="cal-sched-row">
+                  <span className="cal-sched-dot" style={{ background: SCHEDULE_COLOURS[i % SCHEDULE_COLOURS.length] }} />
+                  <span className="cal-sched-client">{s.clientName}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selectedEvents.length === 0 && !showAdd && selectedSchedules.length === 0 && (
             <div className="cal-no-events">
               <CalendarDays size={32} />
               <p>No events on this day</p>
