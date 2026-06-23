@@ -809,7 +809,7 @@ body {
 /* ══════════════════════════════════════════════════════════════════
    ASSISTANT VIEW
 ══════════════════════════════════════════════════════════════════ */
-.assistant-app { max-width: 1280px; margin: 0 auto; padding: 0 40px 80px; width: 100%; }
+.assistant-app { width: 100%; padding: 0 40px 80px; box-sizing: border-box; }
 
 .app-header {
   display: flex; align-items: center; gap: 0; padding: 24px 0 18px;
@@ -1116,7 +1116,7 @@ body {
   .three-day-cols { grid-template-columns: 1fr; }
   .three-day-col { border-right: none; border-bottom: 1px solid var(--border2); }
   .three-day-col:last-child { border-bottom: none; }
-  .assistant-app { padding: 0 16px 80px; }
+  .assistant-app { padding: 0 14px 80px; }
 
   /* ── Retainer modal: fit small screens ── */
   .retainer-reminder-modal { max-width: 95vw; padding: 16px; }
