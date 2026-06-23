@@ -809,7 +809,7 @@ body {
 /* ══════════════════════════════════════════════════════════════════
    ASSISTANT VIEW
 ══════════════════════════════════════════════════════════════════ */
-.assistant-app { max-width: 760px; margin: 0 auto; padding: 0 24px 80px; }
+.assistant-app { max-width: 1280px; margin: 0 auto; padding: 0 40px 80px; width: 100%; }
 
 .app-header {
   display: flex; align-items: center; gap: 0; padding: 24px 0 18px;
@@ -864,6 +864,78 @@ body {
 }
 
 .assistant-task-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Tasks 2-panel layout ───────────────────────────────────────── */
+.tasks-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.tasks-left-col { display: flex; flex-direction: column; gap: 16px; }
+.tasks-right-col { display: flex; flex-direction: column; gap: 12px; }
+.tasks-col-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.85rem; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding-bottom: 10px; border-bottom: 1px solid var(--border2);
+  margin-bottom: 2px;
+}
+
+/* ── Three-day widget ───────────────────────────────────────────── */
+.three-day-widget {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--r2); overflow: hidden;
+}
+.three-day-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border2);
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text3);
+}
+.three-day-cols { display: grid; grid-template-columns: repeat(3, 1fr); }
+.three-day-col {
+  padding: 12px 14px; border-right: 1px solid var(--border2);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.three-day-col:last-child { border-right: none; }
+.three-day-col.today { background: rgba(59,130,246,0.04); }
+.three-day-col-head {
+  display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.three-day-label {
+  font-size: 0.8rem; font-weight: 800; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.three-day-col.today .three-day-label { color: var(--accent); }
+.three-day-date { font-size: 0.72rem; color: var(--text4); }
+.three-day-empty { font-size: 0.75rem; color: var(--text4); font-style: italic; }
+.three-day-section { display: flex; flex-direction: column; gap: 5px; }
+.three-day-section-label {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text4);
+}
+.three-day-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 0.82rem; color: var(--text2); cursor: pointer;
+  border-radius: var(--r); padding: 3px 0;
+}
+.three-day-item.done { opacity: 0.45; text-decoration: line-through; }
+.three-day-item-body { display: flex; flex-direction: column; gap: 1px; }
+.three-day-item-text { font-size: 0.82rem; color: var(--text2); font-weight: 500; }
+.three-day-item-sub { font-size: 0.72rem; color: var(--text4); }
+.tday-check {
+  width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;
+  border: 1.5px solid var(--border3); background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  color: #fff;
+}
+.tday-check.checked { background: var(--accent); border-color: var(--accent); }
+.three-day-item.checkin .tday-check.checked { background: var(--green); border-color: var(--green); }
+.three-day-post-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+}
 .my-task-card {
   background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r);
   padding: 6px 14px;
@@ -1038,6 +1110,13 @@ body {
   }
   .user-row { flex-wrap: wrap; }
   .user-perms { margin-left: 0; }
+
+  /* ── Tasks 2-panel collapses to single column ── */
+  .tasks-layout { grid-template-columns: 1fr; }
+  .three-day-cols { grid-template-columns: 1fr; }
+  .three-day-col { border-right: none; border-bottom: 1px solid var(--border2); }
+  .three-day-col:last-child { border-bottom: none; }
+  .assistant-app { padding: 0 16px 80px; }
 
   /* ── Retainer modal: fit small screens ── */
   .retainer-reminder-modal { max-width: 95vw; padding: 16px; }

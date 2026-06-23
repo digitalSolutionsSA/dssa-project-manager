@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   LogOut, ClipboardList, Tag, Check, ChevronDown, ChevronRight,
   CornerDownRight, CheckCircle2, Sun, Moon, FolderKanban, Calendar, Repeat,
+  CalendarDays, Bell,
 } from 'lucide-react';
 import { AppUser, Project, ProjectTask, PriceListItem, CalendarEvent, RetainerClient, PostSchedule, CheckInReminder, ThemeMode } from './types';
 import PricingPage from './PricingPage';
@@ -86,6 +87,130 @@ function MyTaskCard({ entry, onToggle, onToggleSub }: {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Three-Day Widget ─────────────────────────────────────────────
+const DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as const;
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const SCHED_COLOURS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+
+function ThreeDayWidget({
+  postSchedules, reminders, retainerClients, onCheckIn,
+}: {
+  postSchedules: import('./types').PostSchedule[];
+  reminders: import('./types').CheckInReminder[];
+  retainerClients: import('./types').RetainerClient[];
+  onCheckIn: (id: string) => void;
+}) {
+  const [doneReminders, setDoneReminders] = useState<Set<string>>(new Set());
+  const [doneCheckins, setDoneCheckins] = useState<Set<string>>(new Set());
+
+  const days = [0, 1, 2].map(offset => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d;
+  });
+
+  const pendingCheckins = retainerClients.filter(c => {
+    if (!c.lastCheckIn) return true;
+    const last = new Date(c.lastCheckIn);
+    const today = new Date();
+    return last.toDateString() !== today.toDateString();
+  });
+
+  const hasAnything = days.some((d, i) => {
+    const dow = DOW_NAMES[d.getDay()];
+    const posts = postSchedules.filter(s => s.days.includes(dow as import('./types').DayOfWeek));
+    const rems = reminders.filter(r => r.active && (r.schedule === 'daily' || r.schedule === dow));
+    const checkins = i === 0 ? pendingCheckins : [];
+    return posts.length > 0 || rems.length > 0 || checkins.length > 0;
+  });
+
+  if (!hasAnything) return null;
+
+  return (
+    <div className="three-day-widget">
+      <div className="three-day-header">
+        <CalendarDays size={15} />
+        <span>Next 3 Days</span>
+      </div>
+      <div className="three-day-cols">
+        {days.map((d, i) => {
+          const dow = DOW_NAMES[d.getDay()];
+          const dayPosts = postSchedules.filter(s => s.days.includes(dow as import('./types').DayOfWeek));
+          const dayRems = reminders.filter(r => r.active && (r.schedule === 'daily' || r.schedule === dow));
+          const dayCheckins = i === 0 ? pendingCheckins : [];
+          const isEmpty = dayPosts.length === 0 && dayRems.length === 0 && dayCheckins.length === 0;
+
+          return (
+            <div key={i} className={`three-day-col ${i === 0 ? 'today' : ''}`}>
+              <div className="three-day-col-head">
+                <span className="three-day-label">{i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : dow}</span>
+                <span className="three-day-date">{d.getDate()} {MONTH_SHORT[d.getMonth()]}</span>
+              </div>
+              {isEmpty && <p className="three-day-empty">Nothing scheduled</p>}
+
+              {dayCheckins.length > 0 && (
+                <div className="three-day-section">
+                  <span className="three-day-section-label">Check-ins</span>
+                  {dayCheckins.map(c => (
+                    <label key={c.id} className={`three-day-item checkin ${doneCheckins.has(c.id) ? 'done' : ''}`}>
+                      <button
+                        className={`tday-check ${doneCheckins.has(c.id) ? 'checked' : ''}`}
+                        onClick={() => {
+                          onCheckIn(c.id);
+                          setDoneCheckins(s => new Set([...s, c.id]));
+                        }}
+                      >
+                        {doneCheckins.has(c.id) && <Check size={10} strokeWidth={3} />}
+                      </button>
+                      <span className="three-day-item-text">{c.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {dayRems.length > 0 && (
+                <div className="three-day-section">
+                  <span className="three-day-section-label">Reminders</span>
+                  {dayRems.map(r => (
+                    <label key={r.id} className={`three-day-item reminder ${doneReminders.has(r.id) ? 'done' : ''}`}>
+                      <button
+                        className={`tday-check ${doneReminders.has(r.id) ? 'checked' : ''}`}
+                        onClick={() => setDoneReminders(s => {
+                          const n = new Set(s);
+                          n.has(r.id) ? n.delete(r.id) : n.add(r.id);
+                          return n;
+                        })}
+                      >
+                        {doneReminders.has(r.id) && <Check size={10} strokeWidth={3} />}
+                      </button>
+                      <div className="three-day-item-body">
+                        <span className="three-day-item-text">{r.title}</span>
+                        {r.message && <span className="three-day-item-sub">{r.message}</span>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {dayPosts.length > 0 && (
+                <div className="three-day-section">
+                  <span className="three-day-section-label">Scheduled Posts</span>
+                  {dayPosts.map((s, si) => (
+                    <div key={s.id} className="three-day-item post">
+                      <span className="three-day-post-dot" style={{ background: SCHED_COLOURS[si % SCHED_COLOURS.length] }} />
+                      <span className="three-day-item-text">{s.clientName}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -201,30 +326,48 @@ export default function AssistantView({
 
       {/* ── TASKS TAB ─────────────────────────────────────────────── */}
       {activeTab === 'tasks' && hasTasks && (
-        <main className="assistant-board">
-          {allEntries.length === 0 ? (
-            <div className="assistant-empty">
-              <ClipboardList size={40} style={{ marginBottom: 16, opacity: 0.3 }} />
-              <p className="assistant-empty-title">No tasks assigned yet</p>
-              <p className="assistant-empty-sub">Your admin will assign tasks to you here.</p>
+        <main className="assistant-board tasks-layout">
+          {/* Left: 3-day widget */}
+          <div className="tasks-left-col">
+            <ThreeDayWidget
+              postSchedules={mySchedules}
+              reminders={myReminders}
+              retainerClients={retainerClients.filter(c => isAssignedToMe(c.assignedTo))}
+              onCheckIn={onCheckInRetainer}
+            />
+          </div>
+
+          {/* Right: My Tasks list */}
+          <div className="tasks-right-col">
+            <div className="tasks-col-head">
+              <ClipboardList size={15} />
+              <span>My Tasks</span>
+              {pending.length > 0 && <span className="tab-count">{pending.length}</span>}
             </div>
-          ) : (
-            <div className="assistant-task-list">
-              {pending.map(entry => (
-                <MyTaskCard key={entry.task.id} entry={entry}
-                  onToggle={() => toggleTask(entry)} onToggleSub={sid => toggleSub(entry, sid)} />
-              ))}
-              {completed.length > 0 && (
-                <details className="done-section">
-                  <summary><CheckCircle2 size={13} /> Completed ({completed.length})</summary>
-                  {completed.map(entry => (
-                    <MyTaskCard key={entry.task.id} entry={entry}
-                      onToggle={() => toggleTask(entry)} onToggleSub={sid => toggleSub(entry, sid)} />
-                  ))}
-                </details>
-              )}
-            </div>
-          )}
+            {allEntries.length === 0 ? (
+              <div className="assistant-empty" style={{ padding: '40px 16px' }}>
+                <ClipboardList size={36} style={{ marginBottom: 12, opacity: 0.3 }} />
+                <p className="assistant-empty-title">No tasks assigned yet</p>
+                <p className="assistant-empty-sub">Your admin will assign tasks to you here.</p>
+              </div>
+            ) : (
+              <div className="assistant-task-list">
+                {pending.map(entry => (
+                  <MyTaskCard key={entry.task.id} entry={entry}
+                    onToggle={() => toggleTask(entry)} onToggleSub={sid => toggleSub(entry, sid)} />
+                ))}
+                {completed.length > 0 && (
+                  <details className="done-section">
+                    <summary><CheckCircle2 size={13} /> Completed ({completed.length})</summary>
+                    {completed.map(entry => (
+                      <MyTaskCard key={entry.task.id} entry={entry}
+                        onToggle={() => toggleTask(entry)} onToggleSub={sid => toggleSub(entry, sid)} />
+                    ))}
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
         </main>
       )}
 
