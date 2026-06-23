@@ -669,7 +669,7 @@ body {
 .schedule-day-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ── Calendar schedule tags (in grid cells) ─────────────────────── */
-.cal-sched-tags { display: flex; flex-direction: column; gap: 1px; width: 100%; margin-top: 2px; }
+.cal-sched-tags { display: flex; flex-direction: column; gap: 1px; width: 100%; flex-shrink: 0; }
 .cal-sched-tag {
   display: block; font-size: 0.62rem; font-weight: 700;
   color: #fff; border-radius: 3px; padding: 1px 3px;
@@ -966,17 +966,22 @@ body {
 
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-day {
-  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  padding: 6px 4px 4px; gap: 3px;
   background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
   color: var(--text2); font-size: 0.8125rem; font-weight: 600; cursor: pointer;
-  transition: all 0.12s; font-family: inherit;
+  transition: all 0.12s; font-family: inherit; overflow: hidden;
+}
+.cal-day-num {
+  display: block; width: 100%; text-align: center; line-height: 1;
+  flex-shrink: 0;
 }
 .cal-day:hover { border-color: var(--accent); color: var(--text); }
 .cal-day.outside { color: var(--text4); opacity: 0.4; }
 .cal-day.today { border-color: var(--accent); color: var(--accent); }
 .cal-day.selected { background: var(--accent2); border-color: var(--accent2); color: #fff; }
 .cal-day.selected.today { color: #fff; }
-.cal-dots { display: flex; gap: 3px; }
+.cal-dots { display: flex; gap: 3px; justify-content: center; flex-shrink: 0; }
 .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
 .cal-day.selected .cal-dot { background: #fff; }
 
@@ -1143,7 +1148,7 @@ body {
   .pl-item-price { font-size: 0.9rem; }
 
   /* Calendar day cells: slightly taller for easy tap */
-  .cal-day { min-height: 40px; aspect-ratio: unset; padding: 6px 2px; }
+  .cal-day { min-height: 40px; aspect-ratio: unset; padding: 5px 2px 3px; justify-content: flex-start; }
 
   /* Tab nav: shrink icon labels */
   .tab-btn { padding: 8px 6px; font-size: 0.75rem; }
